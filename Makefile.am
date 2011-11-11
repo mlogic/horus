@@ -1,5 +1,9 @@
 
+##INCLUDES = @INCLUDES@ @OPENSSL_INCLUDES@
+LDFLAGS = @LDFLAGS@ @OPENSSL_LDFLAGS@
+##LIBS = @LIBS@ @OPENSSL_LIBS@
+
 bin_PROGRAMS = horus_key
 horus_key_SOURCES = horus_key.c
-horus_key_LDADD = $(LIBOBJS)
+horus_key_LDADD = @OPENSSL_LIBS@
 

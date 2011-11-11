@@ -20,6 +20,7 @@ AC_CHECK_HEADERS([stdlib.h string.h])
 AC_C_CONST
 
 # Checks for library functions.
+AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL],1,[OpenSSL support.])])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
