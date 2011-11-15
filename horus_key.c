@@ -44,6 +44,7 @@ block_key (char *key, int *key_len,
 #ifdef __APPLE__
   CCHmac (kCCHmacAlgSHA1, parent, parent_len,
           (const void *)&x__y, sizeof (x__y), key);
+  *key_len = SHA_DIGEST_LENGTH;
 #else /*!__APPLE__*/
   HMAC (EVP_sha1(), parent, parent_len,
         (const unsigned char *) &x__y, sizeof (x__y),
