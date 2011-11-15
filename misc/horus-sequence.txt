@@ -1,0 +1,29 @@
+
+Clients hold primary keys, and caluculate sub-keys for each blocks.
+Storage nodes are not aware of keys nor encryption.
+
+Client     Libhorus             Nodes(Storage)              Nodes(MDS)
+                                 (Unreliable)               (Reliable)
+**********************
+  +--[Read]--->
+               +------------[primary key request]------------->
+                                                       [Access Control]
+               <------------[primary key reply]---------------+
+       [Key calculation]
+               +---[I/O request:R]---->
+               <----[I/O response]----+
+          [Decrypt]
+  <--[Data]---+
+**********************
+**********************
+  +--[Write]-->
+               +------------[primary key request]------------->
+                                                       [Access Control]
+               <------------[primary key reply]---------------+
+       [Key calculation]
+          [Encrypt]
+               +---[I/O request:W]---->
+               <----[I/O response]----+
+  <--[Ack]----+
+**********************
+

@@ -7,6 +7,8 @@ AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([horus_key.c])
 AC_CONFIG_HEADER([config.h])
 
+CFLAGS="$CFLAGS -g -O2 -Wall"
+
 # Checks for programs.
 AC_PROG_CC
 
