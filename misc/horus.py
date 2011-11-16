@@ -30,8 +30,6 @@ def block_key (base_key, file_size, byte_offset, start_level=0, end_level=9):
       max_blks = blk_sizes[i-1] / blk_sizes[i]
     else:
       max_blks = 1000000000
-    #blk_num = (cur_offset / blk_sizes[i]) % max_blks
-    #cur_offset = cur_offset % blk_sizes[i]
     blk_num = (byte_offset / blk_sizes[i])
     cur_offset = byte_offset % blk_sizes[i]
     h = hmac.new (cur_key, '%016x' % ((i << 24) | blk_num), hashlib.sha1)
