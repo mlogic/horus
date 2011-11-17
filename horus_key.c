@@ -19,6 +19,7 @@
 #endif
 #endif /*__APPLE__*/
 
+int debug = 0;
 char *progname;
 
 /* Actual branch factor is 2^BRANCH_FACTOR_BITS, i.e., 2^2 = 4. */
@@ -85,11 +86,12 @@ block_key (char *key, int *key_len,
   snprintf (x__y, sizeof (x__y), "%016x", ((x << 24) | y));
 #endif /*NON_STRING_MESSAGE*/
 
-#ifdef DEBUG
-  print_hex ("parent = ", parent, parent_len);
-  printf ("x: %d, y: %d, message: %s, size: %d\n", x, y, x__y, size);
-  print_hex ("message = ", x__y, size);
-#endif /*DEBUG*/
+  if (debug)
+    {
+      print_hex ("parent = ", parent, parent_len);
+      printf ("x: %d, y: %d, message: %s, size: %d\n", x, y, x__y, size);
+      print_hex ("message = ", x__y, size);
+    }
 
 #ifdef __APPLE__
   CCHmac (kCCHmacAlgSHA1, parent, parent_len,
@@ -101,9 +103,8 @@ block_key (char *key, int *key_len,
         key, key_len);
 #endif /*__APPLE__*/
 
-#ifdef DEBUG
-  print_hex ("key = ", key, *key_len);
-#endif /*DEBUG*/
+  if (debug)
+    print_hex ("key = ", key, *key_len);
 
   return key;
 }
@@ -136,6 +137,10 @@ main (int argc, char **argv)
         usage ();
       if (! strcmp (argv[1], "--help"))
         usage ();
+      if (! strcmp (argv[1], "-d"))
+        debug++;
+      if (! strcmp (argv[1], "--debug"))
+        debug++;
     }
 
   /* Byte offset */
@@ -186,7 +191,7 @@ main (int argc, char **argv)
 
       /* parent = str(key) */
       snprintf (parent, sizeof (parent), "%s", print_key (key, key_len));
-      parent_len = strlen (parent);
+      parent_len = strlen (parent); // will be 40.
     }
 
   return 0;
