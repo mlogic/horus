@@ -21,5 +21,6 @@ depcomp
 install-sh
 missing
 stamp-h1
+libtool
 
 horus_key

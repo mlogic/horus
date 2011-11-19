@@ -1,0 +1,2 @@
+% setenv LD_PRELOAD ~/horus/libhorus/.libs/libhorus.so
+
