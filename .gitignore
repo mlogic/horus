@@ -2,7 +2,10 @@ a.out
 a.out.dSYM
 *.o
 *.a
+*.lo
+*.la
 
+.libs
 .deps
 Makefile
 Makefile.in

@@ -6,6 +6,7 @@ AC_INIT(libhorus, 0.0.1, cthulhu@soe.ucsc.edu)
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([horus_key.c])
 AC_CONFIG_HEADER([config.h])
+AC_CONFIG_MACRO_DIR([m4])
 
 CFLAGS="$CFLAGS -g -O2 -Wall"
 
@@ -23,6 +24,10 @@ AC_C_CONST
 
 # Checks for library functions.
 AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL],1,[OpenSSL support.])])
+
+# Libtool
+LT_INIT
+AC_SUBST([LIBTOOL_DEPS])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
