@@ -1,2 +1,5 @@
 % setenv LD_PRELOAD ~/horus/libhorus/.libs/libhorus.so
 
+% setenv DYLD_INSERT_LIBRARIES ~/work/horus/libhorus/.libs/libhorus.dylib
+% setenv DYLD_FORCE_FLAT_NAMESPACE YES
+
