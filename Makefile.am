@@ -12,3 +12,5 @@ horus_key_LDADD = @OPENSSL_LIBS@
 lib_LTLIBRARIES = libhorus.la
 libhorus_la_SOURCES = sysio.c
 
+bin_SCRIPTS = misc/libhorus-env.sh
+
