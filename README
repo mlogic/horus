@@ -1,4 +1,21 @@
 
+Compile:
+  % (optional) sh -x autogen.sh
+  % ./configure
+  % make
+  % make install
+
+Setup:
+  1. add syslog.conf a line about local7 facility.
+     local7.*                       /var/log/local7.log
+
+  2. touch /var/log/local7.log
+     % sudo touch /var/log/local7.log
+
+  3. (optional) add configuration in newsyslog.conf.
+     % sudo cp $(srcdir)/misc/horus-newsyslog.conf /etc/newsyslog.d/
+
+
 csh, tcsh:
 
   To start using libhorus:
