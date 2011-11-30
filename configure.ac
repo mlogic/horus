@@ -30,5 +30,5 @@ AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL],1,[OpenSSL support.])])
 LT_INIT
 AC_SUBST([LIBTOOL_DEPS])
 
-AC_CONFIG_FILES([Makefile misc/libhorus-env.sh])
+AC_CONFIG_FILES([Makefile misc/Makefile])
 AC_OUTPUT

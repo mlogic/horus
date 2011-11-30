@@ -1,0 +1,6 @@
+
+setenv LD_PRELOAD @libdir@/libhorus.so
+
+setenv DYLD_INSERT_LIBRARIES @libdir@/libhorus.dylib
+setenv DYLD_FORCE_FLAT_NAMESPACE YES
+
