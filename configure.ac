@@ -4,7 +4,7 @@
 AC_PREREQ(2.61)
 AC_INIT(libhorus, 0.0.1, cthulhu@soe.ucsc.edu)
 AM_INIT_AUTOMAKE
-AC_CONFIG_SRCDIR([horus_key.c])
+AC_CONFIG_SRCDIR([lib/horus.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_PREFIX_DEFAULT($HOME)
@@ -30,5 +30,5 @@ AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL],1,[OpenSSL support.])])
 LT_INIT
 AC_SUBST([LIBTOOL_DEPS])
 
-AC_CONFIG_FILES([Makefile misc/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile src/Makefile misc/Makefile])
 AC_OUTPUT
