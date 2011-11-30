@@ -1,13 +1,24 @@
 
-sysconf_DATA = libhorus-env.sh libhorus-env.csh
-CLEANFILES = libhorus-env.sh libhorus-env.csh
-EXTRA_DIST = libhorus-env.sh.in libhorus-env.csh.in
+sysconf_DATA = \
+	libhorus-start.sh libhorus-start.csh \
+	libhorus-stop.sh libhorus-stop.csh
+EXTRA_DIST = \
+	libhorus-start.sh.in libhorus-start.csh.in \
+	libhorus-stop.sh.in libhorus-stop.csh.in
+
+CLEANFILES = $(sysconf_DATA)
 
 do_subst = sed -e 's,[@]libdir[@],$(libdir),g'
 
-libhorus-env.sh: libhorus-env.sh.in Makefile
-	$(do_subst) < libhorus-env.sh.in > libhorus-env.sh
+libhorus-start.sh: libhorus-start.sh.in Makefile
+	$(do_subst) < $(srcdir)/$@.in > $@
 
-libhorus-env.csh: libhorus-env.csh.in Makefile
-	$(do_subst) < libhorus-env.csh.in > libhorus-env.csh
+libhorus-stop.sh: libhorus-stop.sh.in Makefile
+	$(do_subst) < $(srcdir)/$@.in > $@
+
+libhorus-start.csh: libhorus-start.csh.in Makefile
+	$(do_subst) < $(srcdir)/$@.in > $@
+
+libhorus-stop.csh: libhorus-stop.csh.in Makefile
+	$(do_subst) < $(srcdir)/$@.in > $@
 

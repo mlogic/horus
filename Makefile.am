@@ -11,8 +11,9 @@ lib_LTLIBRARIES = libhorus.la
 libhorus_la_SOURCES = sysio.c
 
 clean-local: clean-local-dSYM
-.PHONY: clean-local-dSYM
-
+distclean-local: distclean-local-autom4te-cache
+.PHONY: clean-local-dSYM distclean-local-autom4te-cache
 clean-local-dSYM:
 	-rm -rf *.dSYM
-
+distclean-local-autom4te-cache:
+	-rm -rf autom4te.cache

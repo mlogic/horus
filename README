@@ -1,5 +1,9 @@
-% setenv LD_PRELOAD ~/lib/libhorus.so
 
-% setenv DYLD_INSERT_LIBRARIES ~/lib/libhorus.dylib
-% setenv DYLD_FORCE_FLAT_NAMESPACE YES
+csh, tcsh:
+
+To start using libhorus:
+% source $(prefix)/etc/libhorus-start.csh
+
+To stop using libhorus:
+% source $(prefix)/etc/libhorus-stop.csh
 
