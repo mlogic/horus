@@ -1,15 +1,19 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/errno.h>
-#include <sys/uio.h>
-#include <sys/stat.h>
-#include <sys/syscall.h>
+
+#include <horus.h>
 
 #define MESG_SIZE 4096
 
 extern int errno;
+
+int syslog_initialized = 0;
+
+void
+syslog_init ()
+{
+  openlog ("horus", LOG_NOWAIT, LOG_LOCAL7);
+  syslog (LOG_INFO, "openlog.");
+  syslog_initialized++;
+}
 
 ssize_t
 read (int fd, void *buf, size_t nbyte)
@@ -20,9 +24,12 @@ read (int fd, void *buf, size_t nbyte)
   off_t offset;
   char mesg[MESG_SIZE];
 
+  if (! syslog_initialized)
+    syslog_init ();
+
   ret = fstat (fd, &st);
   if (ret != 0)
-    fprintf (stderr, "fstat() failed: %s\n", strerror (errno));
+    syslog (LOG_INFO, "fstat() failed: %m");
 
   pid = getpid ();
   offset = lseek (fd, 0, SEEK_CUR);
@@ -30,19 +37,20 @@ read (int fd, void *buf, size_t nbyte)
   if (ret == 0)
     {
       snprintf (mesg, sizeof (mesg),
-        "pid: %d: read: %d(+%d)/%d rdev: %d, dev: %d, ino: %llx",
-        (int) pid, (int) offset, (int) nbyte,
+        "read: %d(+%d)/%d rdev: %d, dev: %d, ino: %llx",
+        (int) offset, (int) nbyte,
         (int) st.st_size, (int) st.st_rdev, (int) st.st_dev,
         (unsigned long long) st.st_ino);
     }
   else
     {
       snprintf (mesg, sizeof (mesg),
-        "pid: %d: read: %d(+%d)",
-        (int) pid, (int) offset, (int) nbyte);
+        "read: %d(+%d)",
+        (int) offset, (int) nbyte);
     }
 
-  fprintf (stderr, "%s\n", mesg);
+  //fprintf (stderr, "pid: %d: %s\n", (int) pid, mesg);
+  syslog (LOG_INFO, "%s", mesg);
 
   return (ssize_t) syscall (SYS_read, fd, buf, nbyte);
 }
@@ -56,28 +64,33 @@ write (int fd, const void *buf, size_t nbyte)
   off_t offset;
   char mesg[MESG_SIZE];
 
+  if (! syslog_initialized)
+    syslog_init ();
+
   ret = fstat (fd, &st);
   if (ret != 0)
-    fprintf (stderr, "fstat() failed: %s\n", strerror (errno));
+    syslog (LOG_INFO, "fstat() failed: %m");
 
+  pid = getpid ();
   offset = lseek (fd, 0, SEEK_CUR);
 
   if (ret == 0)
     {
       snprintf (mesg, sizeof (mesg),
-        "pid: %d: write: %d(+%d)/%d rdev: %d, dev: %d, ino: %llx",
-        (int) pid, (int) offset, (int) nbyte,
+        "write: %d(+%d)/%d rdev: %d, dev: %d, ino: %llx",
+        (int) offset, (int) nbyte,
         (int) st.st_size, (int) st.st_rdev, (int) st.st_dev,
         (unsigned long long) st.st_ino);
     }
   else
     {
       snprintf (mesg, sizeof (mesg),
-        "pid: %d: write: %d(+%d)",
-        (int) pid, (int) offset, (int) nbyte);
+        "write: %d(+%d)",
+        (int) offset, (int) nbyte);
     }
 
-  fprintf (stderr, "%s\n", mesg);
+  //fprintf (stderr, "pid: %d: %s\n", (int) pid, mesg);
+  syslog (LOG_INFO, "%s", mesg);
 
   return (ssize_t) syscall (SYS_write, fd, buf, nbyte);
 }
@@ -85,7 +98,12 @@ write (int fd, const void *buf, size_t nbyte)
 int
 unlink (const char *path)
 {
-  fprintf (stderr, "Unlink %s.\n", path);
+  pid_t pid;
+  pid = getpid ();
+  if (! syslog_initialized)
+    syslog_init ();
+  //fprintf (stderr, "pid: %d: unlink %s.\n", (int) pid, path);
+  syslog (LOG_INFO, "unlink %s.", path);
   return syscall (SYS_unlink, path);
 }
 

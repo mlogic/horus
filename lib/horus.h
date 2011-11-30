@@ -5,7 +5,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <string.h>
+#include <sys/errno.h>
+#include <sys/uio.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <syslog.h>
 
 #ifdef HAVE_OPENSSL
 #include <openssl/sha.h>
