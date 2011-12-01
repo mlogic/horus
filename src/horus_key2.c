@@ -66,7 +66,8 @@ main (int argc, char **argv)
   x = 9;
   y = offset / block_size[9];
 
-  horus_key_by_master (key, &key_len, x, y, parent, parent_len);
+  //horus_key_by_master (key, &key_len, x, y, parent, parent_len);
+  horus_key_by_master2 (key, &key_len, x, y, parent, parent_len);
 
   printf ("K_(%d,%d) = %s(%d) [%010d-%010d]\n",
           x, y, print_key (key, key_len), key_len,

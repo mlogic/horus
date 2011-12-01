@@ -85,6 +85,66 @@ block_key (char *key, int *key_len,
 }
 
 int
+horus_key_from_to (char *key, int *key_len, int x, int y,
+                   char *parent, int parent_len, int parent_x, int parent_y)
+{
+  char next_parent[SHA_DIGEST_LENGTH * 2 + 1];
+  char ibuf[SHA_DIGEST_LENGTH];
+  int next_parent_len, ibuf_len;
+
+  if (! log_on)
+    log_init ();
+
+  if (debug)
+    syslog (LOG_INFO, "%s(): x = %d, y = %d, parent_x = %d, parent_y = %d",
+            __func__, x, y, parent_x, parent_y);
+
+  /* Base case */
+  if (parent_x == x)
+    {
+      if (parent_y != y)
+        {
+          syslog (LOG_WARNING, "%s(): range mismatch: "
+                  "x = %d, y = %d, parent_x = %d, parent_y = %d",
+                  __func__, x, y, parent_x, parent_y);
+          return -1;
+        }
+
+      block_key (key, key_len, parent, parent_len, x, y);
+      return 0;
+    }
+
+  /* Recursive */
+  horus_key_from_to (ibuf, &ibuf_len, x - 1, y / 4,
+                     parent, parent_len, parent_x, parent_y);
+
+  /* parent = str(key) */
+  snprintf (next_parent, sizeof (next_parent), "%s",
+            print_key (ibuf, ibuf_len));
+  next_parent_len = strlen (next_parent);
+  syslog (LOG_INFO, "x: %d y: %d next_prarent_len: %d",
+          x, y, next_parent_len);
+
+  block_key (key, key_len, next_parent, next_parent_len, x, y);
+
+  return 0;
+}
+
+int
+horus_key_by_master2 (char *key, int *key_len, int x, int y,
+                      char *master, int master_len)
+{
+  if (! log_on)
+    log_init ();
+
+  if (debug)
+    syslog (LOG_INFO, "%s(): x = %d, y = %d", __func__, x, y);
+
+  horus_key_from_to (key, key_len, x, y, master, master_len, 0, 0);
+  return 0;
+}
+
+int
 horus_key_by_master (char *key, int *key_len, int x, int y,
                      char *master, int master_len)
 {
@@ -98,6 +158,7 @@ horus_key_by_master (char *key, int *key_len, int x, int y,
   if (debug)
     syslog (LOG_INFO, "%s(): %d x = %d, y = %d", __func__, __LINE__, x, y);
 
+  /* Base case */
   if (x == 0)
     {
       if (y != 0)
@@ -108,6 +169,7 @@ horus_key_by_master (char *key, int *key_len, int x, int y,
       return 0;
     }
 
+  /* Recursive */
   horus_key_by_master (ikey, &ikey_len, x - 1, y / 4, master, master_len);
 
   /* parent = str(key) */
