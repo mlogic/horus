@@ -1,20 +1,28 @@
 
-Clients hold primary keys, and caluculate sub-keys for each blocks.
+Clients hold only sub-keys for blocks to which it is allowed to access.
 Storage nodes are not aware of keys nor encryption.
 
-Client     Libhorus             Nodes(Storage)              Nodes(MDS)
-                                 (Unreliable)               (Reliable)
+KS: Key Server
+MDS: Meta Data Server
+OSD: Object Storage Device
+
+
+Client     Libhorus         MDS       OSD                     KS
+Read partial file scenario.
 **********************
   +--[Read]--->
-               +------------[primary key request]------------->
+               +----[Req]--->
+               <----[OSD#]--+
+               +------------[key request]--------------------->
                                                        [Access Control]
-               <------------[primary key reply]---------------+
-       [Key calculation]
+               <------------[sub-key reply]-------------------+
                +---[I/O request:R]---->
                <----[I/O response]----+
           [Decrypt]
   <--[Data]---+
 **********************
+
+Write entire file scenario.
 **********************
   +--[Write]-->
                +------------[primary key request]------------->

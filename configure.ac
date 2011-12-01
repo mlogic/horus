@@ -9,7 +9,7 @@ AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_PREFIX_DEFAULT($HOME)
 
-CFLAGS="$CFLAGS -g -O2 -Wall"
+CFLAGS="$CFLAGS -g -O0 -Wall"
 
 # Checks for programs.
 AC_PROG_CC

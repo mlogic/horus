@@ -1,109 +1,82 @@
 
 #include <horus.h>
 
-#define MESG_SIZE 4096
-
-extern int errno;
-
-int syslog_initialized = 0;
-
-void
-syslog_init ()
+int
+open (const char *path, int oflag, ...)
 {
-  openlog ("horus", LOG_NOWAIT, LOG_LOCAL7);
-  syslog (LOG_INFO, "openlog.");
-  syslog_initialized++;
-}
+  mode_t mode = 0;
+  int fd = 0;
 
-ssize_t
-read (int fd, void *buf, size_t nbyte)
-{
-  int ret;
-  pid_t pid;
-  struct stat st;
-  off_t offset;
-  char mesg[MESG_SIZE];
-
-  if (! syslog_initialized)
-    syslog_init ();
-
-  ret = fstat (fd, &st);
-  if (ret != 0)
-    syslog (LOG_INFO, "fstat() failed: %m");
-
-  pid = getpid ();
-  offset = lseek (fd, 0, SEEK_CUR);
-
-  if (ret == 0)
+  if (oflag & O_CREAT)
     {
-      snprintf (mesg, sizeof (mesg),
-        "read: %d(+%d)/%d rdev: %d, dev: %d, ino: %llx",
-        (int) offset, (int) nbyte,
-        (int) st.st_size, (int) st.st_rdev, (int) st.st_dev,
-        (unsigned long long) st.st_ino);
+      va_list ap;
+      va_start (ap, oflag);
+      mode = va_arg (ap, int);
+      va_end (ap);
+      fd = (int) syscall (SYS_open, path, oflag, mode);
     }
   else
     {
-      snprintf (mesg, sizeof (mesg),
-        "read: %d(+%d)",
-        (int) offset, (int) nbyte);
+      fd = (int) syscall (SYS_open, path, oflag);
     }
 
-  //fprintf (stderr, "pid: %d: %s\n", (int) pid, mesg);
-  syslog (LOG_INFO, "%s", mesg);
+  log_open (fd, path, oflag, mode);
 
-  return (ssize_t) syscall (SYS_read, fd, buf, nbyte);
+  return fd;
 }
 
 ssize_t
-write (int fd, const void *buf, size_t nbyte)
+read (int fd, void *buf, size_t size)
 {
-  int ret;
-  pid_t pid;
-  struct stat st;
-  off_t offset;
-  char mesg[MESG_SIZE];
+  ssize_t nbyte;
 
-  if (! syslog_initialized)
-    syslog_init ();
+  if (! isatty (fd))
+    log_read (fd, size);
 
-  ret = fstat (fd, &st);
-  if (ret != 0)
-    syslog (LOG_INFO, "fstat() failed: %m");
+  nbyte = (ssize_t) syscall (SYS_read, fd, buf, size);
 
-  pid = getpid ();
-  offset = lseek (fd, 0, SEEK_CUR);
+  if (! isatty (fd) && nbyte >= 0)
+    horus_decrypt (fd, buf, (size_t) nbyte);
 
-  if (ret == 0)
-    {
-      snprintf (mesg, sizeof (mesg),
-        "write: %d(+%d)/%d rdev: %d, dev: %d, ino: %llx",
-        (int) offset, (int) nbyte,
-        (int) st.st_size, (int) st.st_rdev, (int) st.st_dev,
-        (unsigned long long) st.st_ino);
-    }
-  else
-    {
-      snprintf (mesg, sizeof (mesg),
-        "write: %d(+%d)",
-        (int) offset, (int) nbyte);
-    }
+  return nbyte;
+}
 
-  //fprintf (stderr, "pid: %d: %s\n", (int) pid, mesg);
-  syslog (LOG_INFO, "%s", mesg);
+ssize_t
+write (int fd, const void *buf, size_t size)
+{
+  ssize_t nbyte;
+  void *buf2 = (void *) buf;
 
-  return (ssize_t) syscall (SYS_write, fd, buf, nbyte);
+  if (! isatty (fd))
+    log_write (fd, size);
+
+  if (! isatty (fd))
+    horus_encrypt (fd, buf2, size);
+
+  nbyte = (ssize_t) syscall (SYS_write, fd, buf2, size);
+
+  return nbyte;
+}
+
+int
+close (int fd)
+{
+  log_close (fd);
+  return (int) syscall (SYS_close, fd);
 }
 
 int
 unlink (const char *path)
 {
-  pid_t pid;
-  pid = getpid ();
-  if (! syslog_initialized)
-    syslog_init ();
-  //fprintf (stderr, "pid: %d: unlink %s.\n", (int) pid, path);
-  syslog (LOG_INFO, "unlink %s.", path);
+  log_unlink (path);
   return syscall (SYS_unlink, path);
 }
+
+int
+dup2 (int fd, int fd2)
+{
+  log_dup2 (fd, fd2);
+  return syscall (SYS_dup2, fd, fd2);
+}
+
 

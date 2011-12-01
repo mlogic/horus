@@ -5,9 +5,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/errno.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
@@ -25,6 +27,8 @@
 #include <CommonCrypto/CommonHMAC.h>
 #endif
 #endif /*__APPLE__*/
+
+#include "log.h"
 
 /* Actual branch factor is 2^BRANCH_FACTOR_BITS, i.e., 2^2 = 4. */
 #define BRANCH_FACTOR_BITS     2
@@ -44,4 +48,14 @@ char *print_key (char *key, int key_len);
 char *
 block_key (char *key, int *key_len,
            char *parent, int parent_len, int x, int y);
+
+int
+horus_key_by_master (char *key, int *key_len, int x, int y,
+                     char *master, int master_len);
+
+void
+horus_decrypt (int fd, void *buf, size_t nbyte);
+
+void
+horus_encrypt (int fd, void *buf, size_t nbyte);
 
