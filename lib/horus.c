@@ -131,7 +131,7 @@ horus_key_from_to (char *key, int *key_len, int x, int y,
 }
 
 int
-horus_key_by_master2 (char *key, int *key_len, int x, int y,
+horus_key_by_master (char *key, int *key_len, int x, int y,
                       char *master, int master_len)
 {
   if (! log_on)
@@ -141,42 +141,6 @@ horus_key_by_master2 (char *key, int *key_len, int x, int y,
     syslog (LOG_INFO, "%s(): x = %d, y = %d", __func__, x, y);
 
   horus_key_from_to (key, key_len, x, y, master, master_len, 0, 0);
-  return 0;
-}
-
-int
-horus_key_by_master (char *key, int *key_len, int x, int y,
-                     char *master, int master_len)
-{
-  char parent[SHA_DIGEST_LENGTH * 2 + 1];
-  char ikey[SHA_DIGEST_LENGTH];
-  int parent_len, ikey_len;
-
-  if (! log_on)
-    log_init ();
-
-  if (debug)
-    syslog (LOG_INFO, "%s(): %d x = %d, y = %d", __func__, __LINE__, x, y);
-
-  /* Base case */
-  if (x == 0)
-    {
-      if (y != 0)
-        syslog (LOG_WARNING, "%s(): x = %d, y = %d", __func__, x, y);
-      y = 0;
-
-      block_key (key, key_len, master, master_len, 0, 0);
-      return 0;
-    }
-
-  /* Recursive */
-  horus_key_by_master (ikey, &ikey_len, x - 1, y / 4, master, master_len);
-
-  /* parent = str(key) */
-  snprintf (parent, sizeof (parent), "%s", print_key (ikey, ikey_len));
-  parent_len = strlen (parent);
-
-  block_key (key, key_len, parent, parent_len, x, y);
   return 0;
 }
 

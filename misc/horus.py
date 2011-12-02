@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
+import sys
 import hashlib, hmac
-
 
 def block_key (base_key, file_size, byte_offset, start_level=0, end_level=9):
   '''
@@ -40,6 +40,14 @@ def block_key (base_key, file_size, byte_offset, start_level=0, end_level=9):
   return cur_key
 
 
-print "primary=base_key file_size=3M offset=40960"
-print block_key ("base_key", 3000000, 10*4096, 0, 9)
+argv = sys.argv
+argc = len(argv)
+
+if (argc != 3):
+  print 'Usage: %% python %s offset masterkey' % argv[0]
+  quit()
+
+print 'masterkey=\'%s\' file_size=3M offset=%s' % (argv[2], argv[1])
+print block_key (argv[2], 3000000, int(argv[1]), 0, 9)
+
 

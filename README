@@ -15,20 +15,31 @@ Setup:
   3. (optional) add configuration in newsyslog.conf.
      % sudo cp $(srcdir)/misc/horus-newsyslog.conf /etc/newsyslog.d/
 
+Usage:
 
-csh, tcsh:
+  Using library:
 
-  To start using libhorus:
-  % source $(prefix)/etc/libhorus-start.csh
+    csh, tcsh:
 
-  To stop using libhorus:
-  % source $(prefix)/etc/libhorus-stop.csh
+      To start using libhorus:
+      % source $(prefix)/etc/libhorus-start.csh
 
-sh, bash, zsh:
+      To stop using libhorus:
+      % source $(prefix)/etc/libhorus-stop.csh
 
-  To start using libhorus:
-  % . $(prefix)/etc/libhorus-start.sh
+    sh, bash, zsh:
 
-  To stop using libhorus:
-  % . $(prefix)/etc/libhorus-stop.sh
+      To start using libhorus:
+      % . $(prefix)/etc/libhorus-start.sh
+
+      To stop using libhorus:
+      % . $(prefix)/etc/libhorus-stop.sh
+
+  Using key calculation tools:
+
+      % ~/bin/horus_key <offset> <masterkey>
+      % ~/bin/horus_key2 <offset> <masterkey>
+      % python misc/python.py <offset> <masterkey>
+
+
 
