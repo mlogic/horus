@@ -54,8 +54,5 @@ horus_key_by_master (char *key, int *key_len, int x, int y,
                      char *master, int master_len);
 
 void
-horus_decrypt (int fd, void *buf, size_t nbyte);
-
-void
-horus_encrypt (int fd, void *buf, size_t nbyte);
+horus_coding (int fd, char *buf, int fdpos, size_t nbyte);
 

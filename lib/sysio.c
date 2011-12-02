@@ -1,11 +1,23 @@
 
 #include <horus.h>
 
+int fdesc = -1;
+
 int
 open (const char *path, int oflag, ...)
 {
   mode_t mode = 0;
   int fd = 0;
+  char filename[1024];
+  char *p, *cond;
+
+  strncpy (filename, path, sizeof (filename));
+  p = rindex (filename, '/');
+  if (p)
+    p++;
+  else
+    p = (char *) path;
+  cond = getenv ("HORUS_MATCH_FILE");
 
   if (oflag & O_CREAT)
     {
@@ -22,40 +34,82 @@ open (const char *path, int oflag, ...)
 
   log_open (fd, path, oflag, mode);
 
+  if (p && cond && ! strcasecmp (p, cond))
+    {
+      fdesc = fd;
+    }
+  syslog (LOG_INFO, "path: %s, cond: %s, fd: %d, fdesc: %d",
+          p, cond, fd, fdesc);
+
   return fd;
 }
 
 ssize_t
 read (int fd, void *buf, size_t size)
 {
-  ssize_t nbyte;
+  int nbyte;
+  off_t fdpos;
+  char buf1[9000], buf2[9000];
+
+  memset (buf1, 0, sizeof (buf1));
+  memset (buf2, 0, sizeof (buf2));
 
   if (! isatty (fd))
     log_read (fd, size);
 
-  nbyte = (ssize_t) syscall (SYS_read, fd, buf, size);
+  fdpos = lseek (fd, 0, SEEK_CUR);
 
-  if (! isatty (fd) && nbyte >= 0)
-    horus_decrypt (fd, buf, (size_t) nbyte);
+  nbyte = (int) syscall (SYS_read, fd, buf, size);
 
-  return nbyte;
+  if (fdesc == fd)
+    memcpy (buf1, buf, MIN (size, sizeof (buf1)));
+
+  if (! isatty (fd) && fdesc == fd && nbyte >= 0)
+    horus_coding (fd, buf, fdpos, (size_t) nbyte);
+
+  if (fdesc == fd)
+    memcpy (buf2, buf, MIN (size, sizeof (buf2)));
+
+  if (fdesc == fd)
+    syslog (LOG_INFO, "read: before: %#02x, after: %#02x",
+            (unsigned char) buf1[0],
+            (unsigned char) buf2[0]);
+
+  return (ssize_t) nbyte;
 }
 
 ssize_t
 write (int fd, const void *buf, size_t size)
 {
-  ssize_t nbyte;
-  void *buf2 = (void *) buf;
+  int nbyte;
+  char buf1[9000], buf2[9000];
+  off_t fdpos;
+
+  memset (buf1, 0, sizeof (buf1));
+  memset (buf2, 0, sizeof (buf2));
 
   if (! isatty (fd))
     log_write (fd, size);
 
-  if (! isatty (fd))
-    horus_encrypt (fd, buf2, size);
+  fdpos = lseek (fd, 0, SEEK_CUR);
 
-  nbyte = (ssize_t) syscall (SYS_write, fd, buf2, size);
+  if (fdesc == fd)
+    memcpy (buf1, buf, MIN (size, sizeof (buf2)));
 
-  return nbyte;
+  if (! isatty (fd) && fdesc == fd)
+    horus_coding (fd, (void *) buf, fdpos, size);
+
+  if (fdesc == fd)
+    memcpy (buf2, buf, MIN (size, sizeof (buf2)));
+
+  if (fdesc == fd)
+    syslog (LOG_INFO, "read: before: %#02x, after: %#02x",
+            (unsigned char) buf1[0],
+            (unsigned char) buf2[0]);
+
+  nbyte = (int) syscall (SYS_write, fd, buf, size);
+
+  return (ssize_t) nbyte;
 }
 
 int

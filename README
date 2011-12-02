@@ -17,6 +17,12 @@ Setup:
 
 Usage:
 
+  Using key calculation tools:
+
+      % ~/bin/horus_key <offset> <masterkey>
+      % ~/bin/horus_key2 <offset> <masterkey>
+      % python misc/python.py <offset> <masterkey>
+
   Using library:
 
     csh, tcsh:
@@ -35,11 +41,18 @@ Usage:
       To stop using libhorus:
       % . $(prefix)/etc/libhorus-stop.sh
 
-  Using key calculation tools:
+    Setting keys:
 
-      % ~/bin/horus_key <offset> <masterkey>
-      % ~/bin/horus_key2 <offset> <masterkey>
-      % python misc/python.py <offset> <masterkey>
+      To set master key:
+      % setenv HORUS_KEY_TYPE master
+      % setenv HORUS_KEY_VALUE master-secret
+
+      To set range key: (not tested)
+      % setenv HORUS_KEY_TYPE 4,4
+      % setenv HORUS_KEY_VALUE K4,4-secret
+
+      To take effect for a file:
+      % setenv HORUS_MATCH_FILE <filename> (case insensitive) (to be regex)
 
 
 
