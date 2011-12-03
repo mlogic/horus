@@ -2,6 +2,8 @@
 #include <horus.h>
 
 int debug = 0;
+int is_init = 0;
+fd_set fdset;
 
 unsigned int block_size[] = {
   MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 9),
@@ -15,6 +17,15 @@ unsigned int block_size[] = {
   MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 1),
   MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 0),
 };
+
+void
+horus_init ()
+{
+  if (! log_on)
+    log_init ();
+  FD_ZERO (&fdset);
+  is_init++;
+}
 
 void
 key_to_value (char *key, int *key_len, char *string)
@@ -238,18 +249,15 @@ horus_key_by_master (char *key, int *key_len, int x, int y,
 }
 
 void
-horus_key (char *key, int *key_len, int filepos)
+horus_key (char *key, int *key_len, int filepos,
+           char *ktype, char *kvalue)
 {
   int x, y;
-  char *ktype, *kvalue;
   int rkey_x, rkey_y;
   char keybuf[SHA_DIGEST_LENGTH * 2 + 1];
 
   x = 9;
   y = filepos / MIN_CHUNK_SIZE;
-
-  ktype = getenv ("HORUS_KEY_TYPE");
-  kvalue = getenv ("HORUS_KEY_VALUE");
 
   if (! ktype || ! kvalue)
     {
@@ -278,6 +286,13 @@ horus_key (char *key, int *key_len, int filepos)
 }
 
 void
+horus_get_key (char **ktype, char **kvalue)
+{
+  *ktype = getenv ("HORUS_KEY_TYPE");
+  *kvalue = getenv ("HORUS_KEY_VALUE");
+}
+
+void
 horus_coding_xor (char *buf, int size, char *key, int key_len)
 {
   int i;
@@ -286,16 +301,12 @@ horus_coding_xor (char *buf, int size, char *key, int key_len)
     {
       ch = buf[i];
       buf[i] = ch ^ (unsigned char) key[i % key_len];
-#if 0
-      syslog (LOG_INFO, "XOR: %d: %#02x ^ %#02x = %#02x", i
-              (unsigned char) ch, (unsigned char) key[i % key_len],
-              (unsigned char) buf[i]);
-#endif
     }
 }
 
 void
-horus_coding (int fd, char *buf, int fdpos, size_t nbyte)
+horus_coding (int fd, int fdpos, char *buf, size_t nbyte,
+              char *ktype, char *kvalue)
 {
   char buffer[MIN_CHUNK_SIZE];
   size_t rest = nbyte;
@@ -316,7 +327,7 @@ horus_coding (int fd, char *buf, int fdpos, size_t nbyte)
   memcpy (&buffer[offset], &buf[bufp], ncopy);
 
   /* get key */
-  horus_key (key, &key_len, fdpos);
+  horus_key (key, &key_len, fdpos, ktype, kvalue);
   if (key_len == 0)
     {
       syslog (LOG_WARNING, "failed to get keys. quit coding.");
@@ -342,7 +353,7 @@ horus_coding (int fd, char *buf, int fdpos, size_t nbyte)
       memcpy (&buffer[0], &buf[bufp], ncopy);
 
       /* get key */
-      horus_key (key, &key_len, fdpos);
+      horus_key (key, &key_len, fdpos, ktype, kvalue);
       if (key_len == 0)
         {
           syslog (LOG_WARNING, "failed to get keys. quit coding.");
@@ -361,5 +372,83 @@ horus_coding (int fd, char *buf, int fdpos, size_t nbyte)
     }
 }
 
+int
+horus_open (int fd, const char *path, int oflag, mode_t mode)
+{
+  char *p, *filename, *match;
+
+  if (! is_init)
+    horus_init ();
+
+  if (fd < 0)
+    return -1;
+
+  match = getenv ("HORUS_MATCH_FILE");
+  if (! match)
+    return 0;
+
+  p = rindex (path, '/');
+  filename = (p ? ++p : (char *) path);
+
+  if (! strcasecmp (filename, match))
+    FD_SET (fd, &fdset);
+
+  return 0;
+}
+
+ssize_t
+horus_read (int fd, off_t fdpos, void *buf, size_t size)
+{
+  char *ktype, *kvalue;
+
+  if (! is_init)
+    horus_init ();
+
+  log_read (fd, fdpos, buf, size);
+
+  if (FD_ISSET (fd, &fdset))
+    {
+      horus_get_key (&ktype, &kvalue);
+      if (ktype && kvalue)
+        horus_coding (fd, fdpos, buf, size, ktype, kvalue);
+    }
+
+  return 0;
+}
+
+ssize_t
+horus_write (int fd, off_t fdpos, void *buf, size_t size)
+{
+  char *ktype, *kvalue;
+
+  if (! is_init)
+    horus_init ();
+
+  log_write (fd, fdpos, buf, size);
+
+  if (FD_ISSET (fd, &fdset))
+    {
+      horus_get_key (&ktype, &kvalue);
+      if (ktype && kvalue)
+        horus_coding (fd, fdpos, buf, size, ktype, kvalue);
+    }
+
+  return 0;
+}
+
+int
+horus_close (int fd)
+{
+  if (! is_init)
+    horus_init ();
+
+  if (fd < 0)
+    return -1;
+
+  if (FD_ISSET (fd, &fdset))
+    FD_CLR (fd, &fdset);
+
+  return 0;
+}
 
 

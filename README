@@ -47,12 +47,12 @@ Usage:
       % setenv HORUS_KEY_TYPE master
       % setenv HORUS_KEY_VALUE master-secret
 
-      To set range key: (not tested)
+      To set range key:
       % setenv HORUS_KEY_TYPE 4,4
       % setenv HORUS_KEY_VALUE K4,4-secret
 
-      To take effect for a file:
-      % setenv HORUS_MATCH_FILE <filename> (case insensitive) (to be regex)
+      To take effect for a file: (case insensitive)
+      % setenv HORUS_MATCH_FILE <filename>
 
 
 

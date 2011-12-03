@@ -56,10 +56,9 @@ log_open (int fd, const char *path, int oflag, mode_t mode)
 }
 
 void
-log_read (int fd, size_t nbyte)
+log_read (int fd, off_t fdpos, void *buf, size_t nbyte)
 {
   char mesg[MESG_SIZE];
-  off_t offset;
   int ret;
   struct stat st = { 0 };
 #ifdef LOG_STDERR
@@ -69,14 +68,13 @@ log_read (int fd, size_t nbyte)
   if (! log_on)
     log_init ();
 
-  offset = lseek (fd, 0, SEEK_CUR);
   ret = fstat (fd, &st);
   if (ret != 0)
     syslog (LOG_INFO, "%s(): fstat() failed: %m", __func__);
 
   snprintf (mesg, sizeof (mesg),
     "read: fd: %d bytes: %d(+%d)/%d",
-    fd, (int) offset, (int) nbyte, (int) st.st_size);
+    fd, (int) fdpos, (int) nbyte, (int) st.st_size);
 
 #ifdef LOG_STDERR
   pid = getpid ();
@@ -86,10 +84,9 @@ log_read (int fd, size_t nbyte)
 }
 
 void
-log_write (int fd, size_t nbyte)
+log_write (int fd, off_t fdpos, void *buf, size_t nbyte)
 {
   char mesg[MESG_SIZE];
-  off_t offset;
   int ret;
   struct stat st = { 0 };
 #ifdef LOG_STDERR
@@ -99,14 +96,13 @@ log_write (int fd, size_t nbyte)
   if (! log_on)
     log_init ();
 
-  offset = lseek (fd, 0, SEEK_CUR);
   ret = fstat (fd, &st);
   if (ret != 0)
     syslog (LOG_INFO, "%s(): fstat() failed: %m", __func__);
 
   snprintf (mesg, sizeof (mesg),
     "write: fd: %d bytes: %d(+%d)/%d",
-    fd, (int) offset, (int) nbyte, (int) st.st_size);
+    fd, (int) fdpos, (int) nbyte, (int) st.st_size);
 
 #ifdef LOG_STDERR
   pid = getpid ();
