@@ -63,31 +63,14 @@ main (int argc, char **argv)
         printf ("block_size[%d] = %10d\n", i, block_size[i]);
     }
 
-  for (i = 0; i < 10; i++)
-    {
-      x = i;
-      y = offset / block_size[x];
+  x = 9;
+  y = offset / block_size[9];
 
-#ifdef NON_SHA1_ROOT_KEY
-      if (x != 0)
-        {
-#endif /*NON_SHA1_ROOT_KEY*/
+  horus_key_by_master (key, &key_len, x, y, parent, parent_len);
 
-          /* calculate K_(x,y). */
-          block_key (key, &key_len, parent, parent_len, x, y);
-
-#ifdef NON_SHA1_ROOT_KEY
-        }
-#endif /*NON_SHA1_ROOT_KEY*/
-
-      printf ("K_(%d,%d) = %s(%d) [%010d-%010d]\n",
-               x, y, print_key (key, key_len), key_len,
-               block_size[x] * y, block_size[x] * (y + 1) -1);
-
-      /* parent = str(key) */
-      snprintf (parent, sizeof (parent), "%s", print_key (key, key_len));
-      parent_len = strlen (parent); // will be 40.
-    }
+  printf ("K_(%d,%d) = %s(%d) [%010d-%010d]\n",
+          x, y, print_key (key, key_len), key_len,
+          block_size[x] * y, block_size[x] * (y + 1) -1);
 
   return 0;
 }
