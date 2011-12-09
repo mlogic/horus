@@ -1,5 +1,5 @@
 
-SUBDIRS = lib src misc
+SUBDIRS = lib src etc
 
 AM_CPPFLAGS = -I$(top_srcdir)/lib
 

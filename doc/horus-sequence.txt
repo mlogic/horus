@@ -1,4 +1,27 @@
 
+1. The client send an open request to the MDS.
+     open (path, oflag, ...);
+   MDS returns:
+     ojbect path (Storage node's host and path)
+
+2. The client send a key request to the KDC.
+     key_chain = key_request (path, offset, size, UID, key_server)
+     for (key = key_head (key_chain); key; key = key_next (key))
+       {
+         key->path;           /* file ID */
+         key->min_chunk_size; /* file attributes */
+         key->max_depth;      /* file attributes */
+         key->nbranches;      /* file attributes */
+         key->x;
+         key->y;
+         key->value;
+       }
+    key_chain_free (key_chain);
+    key_free (key);
+
+3. 
+
+
 Clients hold only sub-keys for blocks to which it is allowed to access.
 Storage nodes are not aware of keys nor encryption.
 
