@@ -1,10 +1,30 @@
 
-1. The client send an open request to the MDS.
-     open (path, oflag, ...);
-   MDS returns:
-     ojbect path (Storage node's host and path)
 
-2. The client send a key request to the KDC.
+1. The client send an open request to the system.
+     open (path, oflag, ...);
+
+2. [Ceph] Exchange with MDS. Obtain Meta-data, possibly also object path.
+
+3. System responds with the file handle (file descriptor).
+
+4. [Horus] client send a key request to the KDC, specifying the range
+   (offset and size).
+
+5. [Horus] KDC provides range key(s) (encrypted with clients pubkey)
+
+6. Client issue read()
+
+7. [Ceph] Access to the storage nodes.
+
+8. Client obtains data.
+
+9. [Horus] decrypt the data with the key.
+
+
+
+============== OLD =========================
+
+   The client send a key request to the KDC.
      key_chain = key_request (path, offset, size, UID, key_server)
      for (key = key_head (key_chain); key; key = key_next (key))
        {
@@ -18,8 +38,6 @@
        }
     key_chain_free (key_chain);
     key_free (key);
-
-3. 
 
 
 Clients hold only sub-keys for blocks to which it is allowed to access.
