@@ -372,10 +372,38 @@ file_match (char *spec, char *word)
   return 1;
 }
 
+/* must be followed by a free() */
+char *
+file_path (char *word, char **dirname, char **filename)
+{
+  char *path, *p;
+
+  path = strdup (word);
+  p = strrchr (path, '/');
+  if (p == NULL)
+    {
+      *filename = path;
+      *dirname = ".";
+    }
+  else if (p == &path[0])
+    {
+      *dirname = "/";
+      *filename = &path[1];
+    }
+  else
+    {
+      *p++ = '\0';
+      *dirname = path;
+      *filename = p;
+    }
+
+  return path;
+}
+
 char *
 file_complete (char *word)
 {
-  char *path, *p, *dirname, *filename;
+  char *path, *dirname, *filename;
   DIR *dir;
   struct dirent *dirent;
   int ret, nmatch;
@@ -384,24 +412,7 @@ file_complete (char *word)
   struct stat statbuf;
   static char retbuf[FILENAME_MAX + 1];
 
-  path = strdup (word);
-  p = strrchr (path, '/');
-  if (p == NULL)
-    {
-      filename = path;
-      dirname = ".";
-    }
-  else if (p == &path[0])
-    {
-      dirname = "/";
-      filename = &path[1];
-    }
-  else
-    {
-      dirname = path;
-      *p++ = '\0';
-      filename = p;
-    }
+  path = file_path (word, &dirname, &filename);
 
   dir = opendir (dirname);
   if (dir == NULL)

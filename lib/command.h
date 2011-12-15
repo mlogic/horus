@@ -15,6 +15,7 @@
 #include <errno.h>
 
 #include <vectorx.h>
+#include <vectorx_sort.h>
 
 #define COMMAND_WORD_DELIMITERS " "
 #define COMMAND_HELP_DELIMITERS "\n"
@@ -81,6 +82,7 @@ void command_set_delete (struct command_set *cmdset);
 #define SPEC_STR_FILE         "<FILENAME>"
 #define SPEC_STR_LINE         "LINE"
 
+char *file_path (char *word, char **dirname, char **filename);
 int is_command_match (char *spec, char *word);
 
 void
