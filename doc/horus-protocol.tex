@@ -1,0 +1,23 @@
+\documentclass[11pt]{article}
+
+\usepackage{times,fullpage}
+\usepackage{xspace}
+
+\newcommand{\mds}{\ensuremath{\mathit{MDS}}}
+\newcommand{\kds}{\ensuremath{\mathit{KDS}}}
+
+\begin{document}
+
+This protocol is between metadata server ($\mds$), client ($C$), and
+key distribution server ($\kds$) for a file with root key $K_R$ and
+user $A$.  We assume that \kds\xspace is given private key
+$\textit{KR}_A$, which is paired with public key $\textit{KU}_A$.
+
+\begin{eqnarray*}
+   C \rightarrow \mds & : & \mathsf{open~request} \\
+   \mds \rightarrow C & : & E_{KU_A} (K_R) \\
+   C \rightarrow \kds & : & E_{KU_A} (K_R) || \mathsf{range~key~request} || \mathsf{identification} \\
+   \kds \rightarrow C & : & \mathsf{appropriate~range~keys} \\
+\end{eqnarray*}
+
+\end{document}
