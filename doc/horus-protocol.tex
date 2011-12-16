@@ -14,10 +14,34 @@ user $A$.  We assume that \kds\xspace is given private key
 $\textit{KR}_A$, which is paired with public key $\textit{KU}_A$.
 
 \begin{eqnarray*}
-   C \rightarrow \mds & : & \mathsf{open~request} \\
-   \mds \rightarrow C & : & E_{KU_A} (K_R) \\
-   C \rightarrow \kds & : & E_{KU_A} (K_R) || \mathsf{range~key~request} || \mathsf{identification} \\
-   \kds \rightarrow C & : & \mathsf{appropriate~range~keys} \\
+   \mds & : & \mbox{a meta data server.} \\
+   C    & : & \mbox{a client or a computation node.} \\
+   \kds & : & \mbox{a key distribution server.} \\
+   A    & : & \mbox{a user or an application.} \\
+   \textit{KR}_A & : & \mbox{the private key for $A$.} \\
+   \textit{KU}_A & : & \mbox{the public key for $A$.} \\
+   (bs,d,i,j) & : & \mbox{block size $bs$, depth $d$, range $i,j$.} \\
 \end{eqnarray*}
+
+Key request:
+\begin{eqnarray*}
+  C \rightarrow \mds & : & \mbox{open request} \\
+  \mds \rightarrow C & : & E_{KU_A} (K_R) \\
+  C \rightarrow \kds & : &
+    \{ E_{KU_A} (K_R), \mathsf{range}(bs,d,i,j),
+       \mbox{identification of $C$} \} \\
+  \kds \rightarrow C & : & K_{i,j} \\
+  C \rightarrow \mds & : & E_{KU_C}(K_{i,j})
+       \quad \mbox{(as a cache for $C$.)} \\
+\end{eqnarray*}
+
+\begin{itemize}
+\item identification of $C$ might be $E_{KR_C}(bs,d,i,j)$ (signed range).
+\item the entire message in $C \rightarrow \kds$ might be
+      encrypted by $KU_{\kds}$.
+\item \mds{} can be implemented as extended attributes.
+\item $C$ does not have $\textit{KR}_A$.
+\item \kds{} has $\textit{KR}_A$.
+\end{itemize}
 
 \end{document}
