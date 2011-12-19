@@ -10,8 +10,35 @@
 
 This protocol is between metadata server ($\mds$), client ($C$), and
 key distribution server ($\kds$) for a file with root key $K_R$ and
-user $A$.  We assume that \kds\xspace is given private key
+user $A$.  We assume that $\kds$ is given private key
 $\textit{KR}_A$, which is paired with public key $\textit{KU}_A$.
+
+\vspace{1ex}
+
+The file in question is owned by the application $A$, and we want
+to allow the full access permission to the file only to the
+application $A$ and the trusted $\kds$.
+In other words, both $C$ and $\mds$ are not
+allowed to access the entire file, since both $C$ (i.e., a computation
+node in a supercomputer system) and $\mds$ may be managed by a
+company that is different from the entity that is trying to run
+the application $A$ on the supercomputer%
+\footnote{Hence, the $\mds$ should not have the file's master key $K_R$.}%
+.
+
+$\mds$ provides the attributes of the file; i.e., the owner, permissions
+(modes), the key-hash parameter for the file $(bs,d)$,
+permitted range $(i,j)$ for a client $C$.
+The file attributes are generally open to public, meaning that $\mds$
+does not authenticate clients nor need to have clients' IDs.
+$\mds$ does not need to distinguish $\kds$ from $C$.
+$\mds$ may provide storage service for the keys managed by $\kds$;
+$\mds$ may hold in an extended attribute the master key $K_R$
+encrypted by $\kds$'s public key $KU_{\kds}$ or $A$'s public key $KU_{A}$.
+In this way $\mds$ cannot have $K_R$ and hence cannot have
+the full access to the file.
+$\mds$ can be implemented as the meta data server in Ceph
+or extended attributes (or "\textit{forks}") in other file systems.
 
 \begin{eqnarray*}
    \mds & : & \mbox{a meta data server.} \\
@@ -24,24 +51,31 @@ $\textit{KR}_A$, which is paired with public key $\textit{KU}_A$.
 \end{eqnarray*}
 
 Key request:
-\begin{eqnarray*}
+\begin{eqnarray}
   C \rightarrow \mds & : & \mbox{open request} \\
-  \mds \rightarrow C & : & E_{KU_A} (K_R) \\
+  \mds \rightarrow C & : & \mbox{file attributes: } \{bs,d,E_{KU_A}(K_R)\} \\
   C \rightarrow \kds & : &
-    \{ E_{KU_A} (K_R), \mathsf{range}(bs,d,i,j),
+    \{ E_{KU_A} (K_R), \mbox{range}(bs,d,i,j),
        \mbox{identification of $C$} \} \\
   \kds \rightarrow C & : & K_{i,j} \\
-  C \rightarrow \mds & : & E_{KU_C}(K_{i,j})
-       \quad \mbox{(as a cache for $C$.)} \\
-\end{eqnarray*}
+  C \rightarrow OSD & : & \mbox{file access (read/write)}
+\end{eqnarray}
 
 \begin{itemize}
-\item identification of $C$ might be $E_{KR_C}(bs,d,i,j)$ (signed range).
-\item the entire message in $C \rightarrow \kds$ might be
-      encrypted by $KU_{\kds}$.
-\item \mds{} can be implemented as extended attributes.
-\item $C$ does not have $\textit{KR}_A$.
-\item \kds{} has $\textit{KR}_A$.
+\item we trust that the system is not compromised. The owners and
+      the process IDs, etc, are not faked in the system.
+      So we don't have to worry about the authentication generally
+      (particularly for $\mds$).
+\item However, in order to make $\kds$ serve key calculation service for
+      $C$, $\kds$ needs to authenticate $C$.
+      In this case the identification of $C$
+      can be $E_{KR_C}(bs,d,i,j)$ (range request signed by $C$).
+\item For confidentiality, the entire message in $C \rightarrow \kds$
+      can be encrypted by $KU_{\kds}$.
+\item As a version of design model, private key for $A$ is also managed
+      by $\kds$, not by $C$. In this case, $C$ does not have $\textit{KR}_A$,
+      but $\kds$ has.
 \end{itemize}
 
 \end{document}
+
