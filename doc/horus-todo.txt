@@ -1,0 +1,38 @@
+
+
+1. Design the key exchange protocol. There must be a few different
+   version of the key exchange protocol design, depending, for example,
+   such as whether KDS and MDS talks directly or not. Design specifically
+   considering all possible cases with its pros and cons, and describe
+   it in doc/horus-protocol.tex. (This would be a seed of upcoming
+   TechReport or papers.)
+
+2. Implement the prototype KDS server and the exchange protocol.
+   Implement one of the models designed by 1. above, with consideration
+   to extend or modify possible changes.
+
+3. Investigate the extended attributes in Linux and MacOSX, and create
+   a sample prototype C program that set and get some examples in the
+   extended attributes. Portability using Autoconf is desired.
+
+4. Create a sample code to encrypt/decrypt an arbitrary length of data.
+   Current code is just XOR'ing the data with the key, and it must be
+   replaced LRW, XTS, or at least CTR. (Yan insisted the XTS.)
+   Use of OpenSSL or other famous library is desired, since it affects
+   the portability and applicability (Otherwise, we may suffer to let
+   users to use this).
+
+5. Add an option of interrupting the system calls using FUSE,
+   other than dynamic link's LD_PRELOAD. An issue is whether if we can
+   use FUSE as a filter.
+
+6. In-kernel implementation in Ceph. We will eventually need an efficient
+   kernel-land implementation for performance.
+
+7. Set up Ceph in googoo node 12, 13, and 14. We will use these as the first
+   evaluation environment for Horus. It will be good that all mon, msd, and
+   osd run on every one of each node. You should be able to use the secondary
+   device (/dev/sdb) freely on them.
+
+
+
