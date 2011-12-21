@@ -11,6 +11,26 @@ AC_PREFIX_DEFAULT($HOME)
 
 CFLAGS="$CFLAGS -g -O0 -Wall"
 
+AC_ARG_ENABLE([horus],
+  [AS_HELP_STRING([--enable-horus],
+                  [enable horus functions [default=yes]])])
+AC_ARG_ENABLE([log-syslog],
+  [AS_HELP_STRING([--enable-log-syslog],
+                  [enable logging to syslog [default=yes]])])
+AC_ARG_ENABLE([log-stderr],
+  [AS_HELP_STRING([--enable-log-stderr],
+                  [enable logging to stderr])])
+
+if test "$enable_horus" != "no"; then
+  AC_DEFINE(ENABLE_HORUS,,Enable Horus)
+fi
+if test "$enable_log_syslog" != "no"; then
+  AC_DEFINE(ENABLE_SYSLOG,,Logging to syslog)
+fi
+if test "$enable_log_stderr" = "yes"; then
+  AC_DEFINE(ENABLE_STDERR,,Logging to stderr)
+fi
+
 # Checks for programs.
 AC_PROG_CC
 

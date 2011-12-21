@@ -10,8 +10,6 @@ fd_set fdset;
 void
 horus_init ()
 {
-  if (! log_on)
-    log_init ();
   FD_ZERO (&fdset);
   is_init++;
 }
@@ -48,8 +46,6 @@ horus_read (int fd, off_t fdpos, void *buf, size_t size)
   if (! is_init)
     horus_init ();
 
-  log_read (fd, fdpos, buf, size);
-
   if (FD_ISSET (fd, &fdset))
     {
       horus_get_key (&ktype, &kvalue);
@@ -67,8 +63,6 @@ horus_write (int fd, off_t fdpos, void *buf, size_t size)
 
   if (! is_init)
     horus_init ();
-
-  log_write (fd, fdpos, buf, size);
 
   if (FD_ISSET (fd, &fdset))
     {
