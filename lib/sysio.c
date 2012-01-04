@@ -93,10 +93,17 @@ write (int fd, const void *buf, size_t size)
 int
 close (int fd)
 {
+  struct stat statbuf;
+
+  fstat (fd, &statbuf);
+
 #ifdef ENABLE_HORUS
   horus_close (fd);
 #endif /*ENABLE_HORUS*/
-  log_close (fd);
+
+  if (S_ISREG (statbuf.st_mode))
+    log_close (fd);
+
   return (int) syscall (SYS_close, fd);
 }
 
@@ -104,16 +111,24 @@ int
 unlink (const char *path)
 {
   log_unlink (path);
+
   return syscall (SYS_unlink, path);
 }
 
 int
 dup2 (int fd, int fd2)
 {
+  struct stat statbuf;
+
+  fstat (fd, &statbuf);
+
 #ifdef ENABLE_HORUS
   horus_close (fd2);
 #endif /*ENABLE_HORUS*/
-  log_dup2 (fd, fd2);
+
+  if (S_ISREG (statbuf.st_mode))
+    log_dup2 (fd, fd2);
+
   return syscall (SYS_dup2, fd, fd2);
 }
 

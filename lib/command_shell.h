@@ -23,6 +23,9 @@ EXTERN_COMMAND (disable_shell_debugging);
 struct command_shell *command_shell_create ();
 void command_shell_delete (struct command_shell *csh);
 
+int command_shell_running (struct command_shell *csh);
+void command_shell_run (struct command_shell *csh);
+
 #endif /*_COMMAND_SHELL_H_*/
 
 

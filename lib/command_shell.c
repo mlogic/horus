@@ -8,10 +8,10 @@ DEFINE_COMMAND (exit,
                 "exit",
                 "exit\n")
 {
-  struct shell *shell = (struct shell *) context;
-  fprintf (shell->terminal, "exit !\n");
-  FLAG_SET (shell->flag, SHELL_FLAG_EXIT);
-  shell_close (shell);
+  struct command_shell *csh = (struct command_shell *) context;
+  fprintf (csh->shell->terminal, "exit !\n");
+  FLAG_SET (csh->shell->flag, SHELL_FLAG_EXIT);
+  shell_close (csh->shell);
 }
 
 ALIAS_COMMAND (logout, exit, "logout", "logout\n");
@@ -23,9 +23,9 @@ DEFINE_COMMAND (enable_shell_debugging,
                 "enable shell settings\n"
                 "enable shell debugging\n")
 {
-  struct shell *shell = (struct shell *) context;
-  fprintf (shell->terminal, "enable shell debugging.\n");
-  FLAG_SET (shell->flag, SHELL_FLAG_DEBUG);
+  struct command_shell *csh = (struct command_shell *) context;
+  fprintf (csh->shell->terminal, "enable shell debugging.\n");
+  FLAG_SET (csh->shell->flag, SHELL_FLAG_DEBUG);
 }
 
 DEFINE_COMMAND (disable_shell_debugging,
@@ -34,9 +34,9 @@ DEFINE_COMMAND (disable_shell_debugging,
                 "disable shell settings\n"
                 "disable shell debugging\n")
 {
-  struct shell *shell = (struct shell *) context;
-  fprintf (shell->terminal, "disable shell debugging.\n");
-  FLAG_CLEAR (shell->flag, SHELL_FLAG_DEBUG);
+  struct command_shell *csh = (struct command_shell *) context;
+  fprintf (csh->shell->terminal, "disable shell debugging.\n");
+  FLAG_CLEAR (csh->shell->flag, SHELL_FLAG_DEBUG);
 }
 
 void
@@ -190,6 +190,9 @@ command_shell_ls_candidate (struct shell *shell)
 void
 command_shell_install_default (struct command_shell *csh)
 {
+  INSTALL_COMMAND (csh->cmdset, exit);
+  INSTALL_COMMAND (csh->cmdset, quit);
+  INSTALL_COMMAND (csh->cmdset, logout);
   INSTALL_COMMAND (csh->cmdset, enable_shell_debugging);
   INSTALL_COMMAND (csh->cmdset, disable_shell_debugging);
 }
@@ -214,6 +217,7 @@ command_shell_create ()
   shell_install (csh->shell, '?', command_shell_ls_candidate);
   //shell_install (csh->shell, CONTROL('P'), command_history_prev);
   //shell_install (csh->shell, CONTROL('N'), command_history_next);
+  csh->shell->context = csh;
 
   return csh;
 }
@@ -226,4 +230,23 @@ command_shell_delete (struct command_shell *csh)
   shell_delete (csh->shell);
   free (csh);
 }
+
+void
+command_shell_start (struct command_shell *csh)
+{
+  shell_prompt (csh->shell);
+}
+
+int
+command_shell_running (struct command_shell *csh)
+{
+  return shell_running (csh->shell);
+}
+
+void
+command_shell_run (struct command_shell *csh)
+{
+  shell_read (csh->shell);
+}
+
 

@@ -23,8 +23,10 @@ missing
 stamp-h1
 libtool
 
-horus_key
-horus_key2
-horus_key_server
+src/test-shell
+src/test-command-shell
+
+src/horus-key
+src/horus-kds
 
 horus-*.tar.gz

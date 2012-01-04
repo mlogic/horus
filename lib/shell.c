@@ -4,6 +4,8 @@
 
 #include <shell.h>
 
+#include <sys/syslog.h>
+
 static unsigned char inputch = 0;
 
 int
@@ -417,47 +419,106 @@ shell_delete_word_backward (struct shell *shell)
   shell_cut (shell, start, shell->cursor);
 }
 
+void
+shell_move_left (struct shell *shell, int num)
+{
+  int i;
+  for (i = 0; i < num; i++)
+    writec (shell->writefd, CONTROL('H'));
+}
+
+void
+shell_move_right (struct shell *shell, int num)
+{
+  int i;
+  for (i = 0; i < num; i++)
+    writec (shell->writefd, ' ');
+}
+
 #define DEBUG_POS 82
+//#define SHELL_DEBUG_VERBOSE
 void
 shell_debug (struct shell *shell)
 {
   int i;
-  char debug[64];
+  char debug[128];
+  char inputstr[8];
+
+#ifdef SHELL_DEBUG_VERBOSE
+  log_mesg (LOG_INFO, "debug 1: 0 < cursor: %d < %d",
+            shell->cursor, shell->end);
+#endif /*SHELL_DEBUG_VERBOSE*/
 
   shell_terminate (shell);
   write (shell->writefd, &shell->command_line[shell->cursor],
          strlen (&shell->command_line[shell->cursor]));
+#ifdef SHELL_DEBUG_VERBOSE
+  log_mesg (LOG_INFO, "debug 2: write command_line %d bytes",
+            strlen (&shell->command_line[shell->cursor]));
+#endif /*SHELL_DEBUG_VERBOSE*/
 
   /* Go to the position where the debugging info will be out */
   if (shell->end < DEBUG_POS)
     {
       /* go forward */
-      for (i = shell->end; i < DEBUG_POS; i++)
-        writec (shell->writefd, ' ');
+      shell_move_right (shell, DEBUG_POS - shell->end);
+#ifdef SHELL_DEBUG_VERBOSE
+      log_mesg (LOG_INFO, "debug 3: write white-space %d bytes",
+                DEBUG_POS - shell->end);
+#endif /*SHELL_DEBUG_VERBOSE*/
     }
   else if (shell->end > DEBUG_POS)
     {
       /* go backward */
-      for (i = shell->end; i > DEBUG_POS; i--)
-        writec (shell->writefd, CONTROL('H'));
+      shell_move_left (shell, shell->end - DEBUG_POS);
+#ifdef SHELL_DEBUG_VERBOSE
+      log_mesg (LOG_INFO, "debug 3: write backspace %d bytes",
+                shell->end - DEBUG_POS);
+#endif /*SHELL_DEBUG_VERBOSE*/
     }
 
+  if (inputch == 0x7f)
+    snprintf (inputstr, sizeof (inputstr), "del");
+  else if (iscntrl (inputch))
+    snprintf (inputstr, sizeof (inputstr), "Ctrl-%c", inputch + '@');
+  else
+    snprintf (inputstr, sizeof (inputstr), "%c", inputch);
+
   snprintf (debug, sizeof (debug),
-            "prevhead=%d whead=%d wend=%d cursor=%d end=%d "
-            "inputch=%0x('%c') size=%d",
+            "prevhead=%d whead=%d wend=%d cursor=%d end=%d size=%d "
+            "inputch=%0x('%s')",
             shell_word_prev_head (shell, shell->cursor),
             shell_word_head (shell, shell->cursor),
             shell_word_end (shell, shell->cursor),
-            shell->cursor, shell->end,
-            inputch, inputch, shell->size);
+            shell->cursor, shell->end, shell->size,
+            inputch, inputstr);
   write (shell->writefd, debug, strlen (debug));
+#ifdef SHELL_DEBUG_VERBOSE
+  log_mesg (LOG_INFO, "debug 4: write debug message %d bytes",
+            strlen (debug));
+#endif /*SHELL_DEBUG_VERBOSE*/
 
   /* Go back to the position where the cursor should be */
   if (shell->end < DEBUG_POS + strlen (debug))
     {
       /* go backward */
-      for (i = DEBUG_POS + strlen (debug); i > shell->cursor; i--)
-        writec (shell->writefd, CONTROL('H'));
+      shell_move_left (shell, strlen (debug));
+#ifdef SHELL_DEBUG_VERBOSE
+      log_mesg (LOG_INFO, "debug 5-1: write backspace %d bytes",
+                strlen (debug));
+#endif /*SHELL_DEBUG_VERBOSE*/
+
+      shell_move_left (shell, DEBUG_POS - shell->end);
+#ifdef SHELL_DEBUG_VERBOSE
+      log_mesg (LOG_INFO, "debug 5-2: write backspace %d bytes",
+                DEBUG_POS - shell->end);
+#endif /*SHELL_DEBUG_VERBOSE*/
+
+      shell_move_left (shell, shell->end - shell->cursor);
+#ifdef SHELL_DEBUG_VERBOSE
+      log_mesg (LOG_INFO, "debug 5-3: write backspace %d bytes",
+                shell->end - shell->cursor);
+#endif /*SHELL_DEBUG_VERBOSE*/
     }
   else if (DEBUG_POS + strlen (debug) < shell->end)
     {
@@ -465,7 +526,14 @@ shell_debug (struct shell *shell)
       i = shell->end - DEBUG_POS - strlen (debug);
       write (shell->writefd,
              &shell->command_line[DEBUG_POS + strlen (debug)], i);
+#ifdef SHELL_DEBUG_VERBOSE
+      log_mesg (LOG_INFO, "debug 5: write command_line %d bytes", i);
+#endif /*SHELL_DEBUG_VERBOSE*/
     }
+
+#ifdef SHELL_DEBUG_VERBOSE
+  log_mesg (LOG_INFO, "debug 6: debug end");
+#endif /*SHELL_DEBUG_VERBOSE*/
 }
 
 void
@@ -766,7 +834,8 @@ shell_input (struct shell *shell, unsigned char ch)
     FLAG_CLEAR (shell->flag, SHELL_FLAG_ESCAPE);
 
   if (FLAG_CHECK (shell->flag, SHELL_FLAG_DEBUG))
-    shell_refresh (shell);
+    shell_debug (shell);
+    //shell_refresh (shell);
 }
 
 void
