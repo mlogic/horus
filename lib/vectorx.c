@@ -18,6 +18,24 @@
    far away from the current maximum index. */
 #define VECTORX_RETRY 16
 
+void
+vectorx_mutex_lock (struct vectorx *v)
+{
+#ifdef HAVE_PTHREAD
+  pthread_mutex_lock (&v->mutex);
+#endif /*HAVE_PTHREAD*/
+}
+
+void
+vectorx_mutex_unlock (struct vectorx *v)
+{
+#ifdef HAVE_PTHREAD
+  pthread_mutex_unlock (&v->mutex);
+#endif /*HAVE_PTHREAD*/
+}
+
+/* vectorx_lookup_index() does not treat mutex.
+   It must already be acquired. */
 int
 vectorx_lookup_index (void *data, struct vectorx *v)
 {
@@ -37,12 +55,19 @@ void *
 vectorx_lookup (void *data, struct vectorx *v)
 {
   int index;
+  void *ret = NULL;
+
+  vectorx_mutex_lock (v);
   index = vectorx_lookup_index (data, v);
-  if (index < 0)
-    return NULL;
-  return v->array[index];
+  if (index >= 0)
+    ret = v->array[index];
+  vectorx_mutex_unlock (v);
+
+  return ret;
 }
 
+/* vectorx_expand() does not treat mutex.
+   It must already be acquired. */
 static void
 vectorx_expand (struct vectorx *v)
 {
@@ -64,20 +89,23 @@ vectorx_add (void *data, struct vectorx *v)
 {
   int retry = VECTORX_RETRY;
 
+  vectorx_mutex_lock (v);
+
+  while (retry-- && v->size == v->limit)
+    vectorx_expand (v);
+
   if (v->size == v->limit)
     {
-      while (retry-- && v->size == v->limit)
-        vectorx_expand (v);
-      if (v->size == v->limit)
-        {
-          fprintf (stderr, "Cannot double vector size from %d\n", v->limit);
-          fprintf (stderr, "Give up to add data %p\n", data);
-          return;
-        }
+      fprintf (stderr, "Cannot double vector size from %d\n", v->limit);
+      fprintf (stderr, "Give up to add data %p\n", data);
+    }
+  else
+    {
+      /* add */
+      v->array[v->size++] = data;
     }
 
-  /* add */
-  v->array[v->size++] = data;
+  vectorx_mutex_unlock (v);
 }
 
 void
@@ -85,23 +113,28 @@ vectorx_remove (void *data, struct vectorx *v)
 {
   int index;
 
+  vectorx_mutex_lock (v);
+
   index = vectorx_lookup_index (data, v);
-  if (index < 0)
+  if (index >= 0)
+    {
+      /* remove */
+      v->array[index] = NULL;
+      v->size--;
+
+      /* shift */
+      if (index + 1 < v->limit)
+        memmove (&v->array[index], &v->array[index + 1],
+                 (v->limit - index - 1) * sizeof (void *));
+    }
+  else
     {
       fprintf (stderr, "Can't remove from vector[%p]: no such data: %p\n",
                v, data);
       assert (0);
-      return;
     }
 
-  /* remove */
-  v->array[index] = NULL;
-  v->size--;
-
-  /* shift */
-  if (index + 1 < v->limit)
-    memmove (&v->array[index], &v->array[index + 1],
-             (v->limit - index - 1) * sizeof (void *));
+  vectorx_mutex_unlock (v);
 }
 
 void
@@ -109,6 +142,8 @@ vectorx_remove_index (int index, struct vectorx *v)
 {
   assert (index >= 0);
 
+  vectorx_mutex_lock (v);
+
   /* remove */
   v->array[index] = NULL;
   v->size--;
@@ -117,13 +152,19 @@ vectorx_remove_index (int index, struct vectorx *v)
   if (index + 1 < v->limit)
     memmove (&v->array[index], &v->array[index + 1],
              (v->limit - index - 1) * sizeof (void *));
+
+  vectorx_mutex_unlock (v);
 }
 
 void
 vectorx_clear (struct vectorx *v)
 {
+  vectorx_mutex_lock (v);
+
   memset (v->array, 0, v->limit * sizeof (void *));
   v->size = 0;
+
+  vectorx_mutex_unlock (v);
 }
 
 /* You will not want to sort the vector when you use below functions */
@@ -132,42 +173,57 @@ vectorx_set (struct vectorx *v, int index, void *data)
 {
   int retry = VECTORX_RETRY;
 
+  vectorx_mutex_lock (v);
+
+  while (retry-- && v->limit <= index)
+    vectorx_expand (v);
+
   if (v->limit <= index)
     {
-      while (retry-- && v->limit <= index)
-        vectorx_expand (v);
-      if (v->limit <= index)
-        {
-          fprintf (stderr, "Cannot double vector size from %d\n", v->limit);
-          fprintf (stderr, "Give up to set data %p at index %d\n", data, index);
-          return;
-        }
+      fprintf (stderr, "Cannot double vector size from %d\n", v->limit);
+      fprintf (stderr, "Give up to set data %p at index %d\n", data, index);
+    }
+  else
+    {
+      /* add */
+      v->array[index] = data;
+      if (v->size <= index)
+        v->size = index + 1;
     }
 
-  /* add */
-  v->array[index] = data;
-  if (v->size <= index)
-    v->size = index + 1;
+  vectorx_mutex_unlock (v);
 }
 
 void *
 vectorx_get (struct vectorx *v, int index)
 {
-  if (v->size <= index)
-    return NULL;
-  return v->array[index];
+  void *ret = NULL;
+
+  vectorx_mutex_lock (v);
+
+  if (v->size > index)
+    ret = v->array[index];
+
+  vectorx_mutex_unlock (v);
+
+  return ret;
 }
 
+/* vectorx_empty_index() does not treat mutex.
+   It must already be acquired. */
 int
 vectorx_empty_index (struct vectorx *v)
 {
-  int index;
-  for (index = 0; index < v->size; index++)
-    if (v->array[index] == NULL)
-      return index;
+  int i, index = -1;
+
+  for (i = 0; i < v->size; i++)
+    if (index < 0 && v->array[i] == NULL)
+      index = i;
+
   return index;
 }
 
+/* Vectorx is locked during the iteration. */
 struct vectorx_node *
 vectorx_head (struct vectorx *vector)
 {
@@ -180,6 +236,8 @@ vectorx_head (struct vectorx *vector)
   if (! node)
     return NULL;
   memset (node, 0, sizeof (struct vectorx_node));
+
+  vectorx_mutex_lock (vector);
 
   node->vector = vector;
   node->index = 0;
@@ -200,6 +258,8 @@ vectorx_next (struct vectorx_node *node)
   /* if index reaches end, return NULL */
   if (node->index >= node->vector->size)
     {
+      vectorx_mutex_unlock (node->vector);
+
       free (node);
       return NULL;
     }
@@ -213,6 +273,7 @@ vectorx_next (struct vectorx_node *node)
 void
 vectorx_break (struct vectorx_node *node)
 {
+  vectorx_mutex_unlock (node->vector);
   free (node);
 }
 
@@ -235,12 +296,20 @@ vectorx_create ()
     }
   memset (v->array, 0, v->limit * sizeof (void *));
 
+#ifdef HAVE_PTHREAD
+  pthread_mutex_init (&v->mutex, NULL);
+#endif /*HAVE_PTHREAD*/
+
   return v;
 }
 
 void
 vectorx_delete (struct vectorx *v)
 {
+#ifdef HAVE_PTHREAD
+  pthread_mutex_destroy (&v->mutex);
+#endif /*HAVE_PTHREAD*/
+
   free (v->array);
   free (v);
 }

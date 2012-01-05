@@ -20,6 +20,19 @@ shell_terminate (struct shell *shell)
   shell->command_line[shell->end] = '\0';
 }
 
+int
+shell_printf (struct shell *shell, char *format, ...)
+{
+  int ret;
+  va_list ap;
+  va_start (ap, format);
+  ret = vfprintf (shell->terminal, format, ap);
+  va_end (ap);
+  fflush (shell->terminal);
+  shell_linefeed (shell);
+  return ret;
+}
+
 void
 shell_format (struct shell *shell)
 {
@@ -64,7 +77,11 @@ shell_format (struct shell *shell)
 void
 shell_linefeed (struct shell *shell)
 {
+#if 0
   writec (shell->writefd, '\n');
+#else
+  write (shell->writefd, "\r\n", 2);
+#endif
 }
 
 void
@@ -541,6 +558,7 @@ shell_refresh (struct shell *shell)
 {
   int i;
 
+  fflush (shell->terminal);
   shell_prompt (shell);
 
   /* print current command line */

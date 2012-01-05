@@ -10,3 +10,5 @@ void log_close (int fd);
 void log_unlink (const char *path);
 void log_dup2 (int fd, int fd2);
 
+void log_mesg (int priority, char *message, ...);
+void log_error (char *message, ...);

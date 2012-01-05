@@ -18,12 +18,18 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+
 #include <arpa/inet.h>
+#include <arpa/telnet.h>
 
 #ifdef HAVE_OPENSSL
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 #endif /*HAVE_OPENSSL*/
+
+#ifdef HAVE_PTHREAD
+#include <pthread.h>
+#endif /*HAVE_PTHREAD*/
 
 #ifdef __APPLE__
 #include "TargetConditionals.h"
@@ -33,6 +39,7 @@
 #endif /*__APPLE__*/
 
 #include "log.h"
+#include "command_shell.h"
 
 #include "horus_key.h"
 #include "horus_crypt.h"

@@ -28,7 +28,7 @@ struct thread_arg {
 struct thread_arg arg[THREAD_MAX];
 
 void *
-thread_func (void *thread_arg)
+test_func (void *thread_arg)
 {
   struct thread_arg *arg = (struct thread_arg *) thread_arg;
   printf ("thread[%d]: 1. started.\n", arg->index);
@@ -71,7 +71,7 @@ main (int argc, char **argv)
   for (i = 0; i < THREAD_MAX; i++)
     {
       arg[i].index = i;
-      arg[i].func = thread_func;
+      arg[i].func = test_func;
     }
 
   for (i = 0; i < nthreads; i++)

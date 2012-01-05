@@ -28,6 +28,8 @@ vectorx_sort (vectorx_cmp_t cmp, struct vectorx *v)
   assert (cmp);
   retval = 0;
 
+  vectorx_mutex_lock (v);
+
   /* sort */
 #ifdef HAVE_HEAPSORT
   retval = heapsort (v->array, v->size, sizeof (void *), cmp);
@@ -36,6 +38,8 @@ vectorx_sort (vectorx_cmp_t cmp, struct vectorx *v)
 #else /*HAVE_HEAPSORT*/
   qsort (v->array, v->size, sizeof (void *), cmp);
 #endif /*HAVE_HEAPSORT*/
+
+  vectorx_mutex_unlock (v);
 }
 
 /* returns index for data using binary search (recursive function) */
@@ -64,7 +68,7 @@ vectorx_binsearch (void *data, int index, int size,
   return -1;
 }
 
-int
+static int
 vectorx_lookup_index_bsearch (void *data, vectorx_cmp_t cmp,
                               struct vectorx *v)
 {
@@ -84,10 +88,19 @@ vectorx_lookup_bsearch (void *data, vectorx_cmp_t cmp,
                        struct vectorx *v)
 {
   int index;
+  void *ret;
+
+  vectorx_mutex_lock (v);
+
   index = vectorx_lookup_index_bsearch (data, cmp, v);
   if (index < 0)
-    return NULL;
-  return v->array[index];
+    ret = NULL;
+  else
+    ret = v->array[index];
+
+  vectorx_mutex_unlock (v);
+
+  return ret;
 }
 
 

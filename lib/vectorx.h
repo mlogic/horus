@@ -5,11 +5,19 @@
 #ifndef _VECTORX_H_
 #define _VECTORX_H_
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif /*HAVE_CONFIG_H*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <assert.h>
+
+#ifdef HAVE_PTHREAD
+#include <pthread.h>
+#endif /*HAVE_PTHREAD*/
 
 struct vectorx_node
 {
@@ -24,8 +32,14 @@ struct vectorx
   void **array;
   unsigned int limit;
   unsigned int size;
+#ifdef HAVE_PTHREAD
+  pthread_mutex_t mutex;
+#endif /*HAVE_PTHREAD*/
 };
 typedef struct vectorx *vectorx_t;
+
+void vectorx_mutex_lock (struct vectorx *v);
+void vectorx_mutex_unlock (struct vectorx *v);
 
 int vectorx_lookup_index (void *data, struct vectorx *v);
 void *vectorx_lookup (void *data, struct vectorx *v);

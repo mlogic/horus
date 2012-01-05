@@ -9,7 +9,7 @@ DEFINE_COMMAND (exit,
                 "exit\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
-  fprintf (csh->shell->terminal, "exit !\n");
+  shell_printf (csh->shell, "exit !");
   FLAG_SET (csh->shell->flag, SHELL_FLAG_EXIT);
   shell_close (csh->shell);
 }
@@ -24,7 +24,7 @@ DEFINE_COMMAND (enable_shell_debugging,
                 "enable shell debugging\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
-  fprintf (csh->shell->terminal, "enable shell debugging.\n");
+  shell_printf (csh->shell, "enable shell debugging.");
   FLAG_SET (csh->shell->flag, SHELL_FLAG_DEBUG);
 }
 
@@ -35,7 +35,7 @@ DEFINE_COMMAND (disable_shell_debugging,
                 "disable shell debugging\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
-  fprintf (csh->shell->terminal, "disable shell debugging.\n");
+  shell_printf (csh->shell, "disable shell debugging.");
   FLAG_CLEAR (csh->shell->flag, SHELL_FLAG_DEBUG);
 }
 
@@ -70,7 +70,7 @@ command_shell_execute (struct shell *shell)
 
   ret = command_execute (shell->command_line, csh->cmdset, csh);
   if (ret < 0)
-    fprintf (shell->terminal, "no such command: %s\n", shell->command_line);
+    shell_printf (shell, "no such command: %s", shell->command_line);
   //command_history_add (shell->command_line, shell->history, shell);
 
   /* FILE buffer must be flushed before raw-writing the same file */
@@ -120,10 +120,10 @@ command_shell_ls_filename (struct command_shell *csh, char *word)
           fprintf (csh->shell->terminal, "  ");
         fprintf (csh->shell->terminal, "%-16s", dirent->d_name);
         if (num % 4 == 3)
-          fprintf (csh->shell->terminal, "\n");
+          shell_linefeed (csh->shell);
         num++;
       }
-  fprintf (csh->shell->terminal, "\n");
+  shell_linefeed (csh->shell);
 
   free (path);
 }
@@ -163,16 +163,14 @@ command_shell_ls_candidate (struct shell *shell)
     {
       /* if the fixed_part is executable, print <cr> with its helpstr */
       if (last_word_index == shell->cursor && match->func)
-        fprintf (shell->terminal, "  %-16s %s\n",
-                 "<cr>", match->helpstr);
+        shell_printf (shell, "  %-16s %s", "<cr>", match->helpstr);
 
       /* show candidates in current node */
       for (vn = vectorx_head (match->cmdvec); vn; vn = vectorx_next (vn))
         {
           node = (struct command_node *) vn->data;
           if (is_command_match (node->cmdstr, last_word))
-            fprintf (shell->terminal, "  %-16s %s\n",
-                     node->cmdstr, node->helpstr);
+            shell_printf (shell, "  %-16s %s", node->cmdstr, node->helpstr);
 
           /* additionally show filename candidates */
           if (file_spec (node->cmdstr))

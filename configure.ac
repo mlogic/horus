@@ -46,6 +46,8 @@ AC_C_CONST
 # Checks for library functions.
 AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL],1,[OpenSSL support.])])
 
+AX_PTHREAD([AC_DEFINE([HAVE_PTHREAD],1,[POSIX thread support.])])
+
 # Libtool
 LT_INIT
 AC_SUBST([LIBTOOL_DEPS])

@@ -13,8 +13,6 @@ int vectorx_compare (const void *a, const void *b);
 
 void vectorx_sort (vectorx_cmp_t cmp, struct vectorx *v);
 
-int vectorx_lookup_index_bsearch (void *data, vectorx_cmp_t cmp,
-                                 struct vectorx *v);
 void *vectorx_lookup_bsearch (void *data, vectorx_cmp_t cmp,
                              struct vectorx *v);
 

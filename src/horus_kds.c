@@ -74,129 +74,196 @@ terminal_socket ()
   return fd;
 }
 
-#if 0
+#define THREAD_STATE_NONE     0
+#define THREAD_STATE_RELEASED 1
+#define THREAD_STATE_ENDING   2
+#define THREAD_STATE_MAX      3
 
-void *
-terminal_accept (void *thread_arg)
+struct thread {
+  pthread_t pthread;
+  int index;
+  int state;
+  void *(*func) (void *thread);
+  int readfd;
+  int writefd;
+  void *arg;
+  void *ret;
+};
+
+#define THREAD_MAX 256
+struct thread threads[THREAD_MAX];
+
+#define COND_THREAD 0
+#define COND_MAX 1
+pthread_mutex_t cond_mutex[COND_MAX];
+pthread_cond_t cond[COND_MAX];
+
+void
+thread_init ()
 {
-  struct thread_arg *arg;
-  int acceptfd, fd;
-  struct sockaddr_in saddr;
-  socklen_t saddr_len;
+  int i;
 
-  arg = (struct thread_arg *) thread_arg;
-  acceptfd = thread_arg_get_fd (arg);
-  thread_arg_free (arg);
-
-  fd = accept (acceptfd, (struct sockaddr *) &saddr, &saddr_len);
-  if (fd < 0)
+  memset (threads, 0, sizeof (threads));
+  for (i = 0; i < THREAD_MAX; i++)
     {
-      fprintf (stderr, "accept() failed: %s\n", strerror (errno));
-      return NULL;
+      threads[i].index = i;
+      threads[i].state = THREAD_STATE_RELEASED;
+    }
+}
+
+struct thread *
+thread_get ()
+{
+  int i;
+  for (i = 0; i < THREAD_MAX; i++)
+    {
+      if (threads[i].state == THREAD_STATE_RELEASED)
+        break;
     }
 
-  shell = shell_create ();
-  shell_set_terminal (shell, fd, fd);
+  if (i == THREAD_MAX)
+    return NULL;
 
-  arg = thread_arg_get ();
-  thread_arg_set_val (arg, shell);
-  thread_add_read (master, terminal_read, arg);
+  return &threads[i];
+}
+
+void
+thread_release (struct thread *t)
+{
+  t->state = THREAD_STATE_ENDING;
+  pthread_cond_broadcast (&cond[COND_THREAD]);
+}
+
+int
+thread_running (struct thread *master)
+{
+  return 1;
+}
+
+int
+thread_run (struct thread *master)
+{
+  int i;
+
+  pthread_mutex_lock (&cond_mutex[COND_THREAD]);
+  pthread_cond_wait (&cond[COND_THREAD], &cond_mutex[COND_THREAD]);
+  pthread_mutex_unlock (&cond_mutex[COND_THREAD]);
+
+  for (i = 0; i < THREAD_MAX; i++)
+    {
+      if (threads[i].state == THREAD_STATE_ENDING)
+        {
+          pthread_join (threads[i].pthread, &threads[i].ret);
+          threads[i].state = THREAD_STATE_RELEASED;
+        }
+    }
+
+  return 0;
+}
+
+int
+thread_add_read (struct thread *t)
+{
+  pthread_create (&t->pthread, NULL, t->func, t);
+  return 0;
+}
+
+void
+terminal_setting (struct command_shell *shell)
+{
+  char will_echo[] =              { IAC, WILL, TELOPT_ECHO, '\0' };
+  char will_suppress_go_ahead[] = { IAC, WILL, TELOPT_SGA, '\0' };
+  char dont_linemode[] =          { IAC, DONT, TELOPT_LINEMODE, '\0' };
+  write (shell->shell->writefd, will_echo, 3);
+  write (shell->shell->writefd, will_suppress_go_ahead, 3);
+  write (shell->shell->writefd, dont_linemode, 3);
+}
+
+void *
+terminal_service (void *arg)
+{
+  struct thread *thread = (struct thread *) arg;
+  struct command_shell *shell;
+
+  shell = command_shell_create ();
+  shell_set_terminal (shell->shell, thread->readfd, thread->writefd);
+  terminal_setting (shell);
+  command_shell_start (shell);
+
+  while (command_shell_running (shell))
+    command_shell_run (shell);
+
+  command_shell_delete (shell);
 
   return NULL;
 }
 
 void *
-terminal_read (void *thread_arg)
+terminal_accept (void *arg)
 {
-  struct thread_arg *arg;
-  struct shell *shell;
+  struct thread *thread = (struct thread *) arg;
+  struct thread *t;
 
-  arg = (strcut thread_arg *) thread_arg;
-  shell = (struct shell *) thread_arg_get_val (arg);
-  thread_arg_free (arg);
+  int acceptfd, fd;
+  struct sockaddr_in saddr;
+  socklen_t saddr_len;
 
-  while (shell_running (shell))
-    shell_read (shell);
+  acceptfd = thread->readfd;
 
+  while (1)
+    {
+      fd = accept (acceptfd, (struct sockaddr *) &saddr, &saddr_len);
+      if (fd < 0)
+        {
+          log_error ("accept() failed: %s\n", strerror (errno));
+          return NULL;
+        }
+
+      t = thread_get ();
+      assert (t);
+      t->func = terminal_service;
+      t->readfd = fd;
+      t->writefd = fd;
+      t->arg = NULL;
+      thread_add_read (t);
+    }
+
+  thread_release (thread);
   return NULL;
 }
 
 void
 terminal_init ()
 {
-  struct thread_arg *arg;
   int fd;
+  struct thread *t;
+
   fd = terminal_socket ();
-  if (fd < 0)
-    exit (-1);
 
-  arg = thread_arg_get ();
-  thread_arg_set_fd (arg, fd);
-  thread_add_read (master, terminal_accept, arg);
-}
-
-void
-key_server_init ()
-{
+  t = thread_get ();
+  assert (t);
+  t->func = terminal_accept;
+  t->readfd = fd;
+  t->writefd = fd;
+  t->arg = NULL;
+  thread_add_read (t);
 }
 
 int
 main (int argc, char **argv)
 {
-  struct thread_master *master;
+  struct thread *master = NULL;
 
-  master = thread_master_create ();
+  thread_init ();
+  //master = thread_master_create ();
 
   terminal_init ();
-  key_server_init ();
 
   while (thread_running (master))
     thread_run (master);
 
   /* Not reached */
-  thread_master_delete (master);
-
-  return 0;
-}
-
-#endif
-
-int
-main (int argc, char **argv)
-{
-  struct sockaddr_in caddr;
-  socklen_t caddr_len = sizeof (caddr);
-
-  int ret;
-  char buf[4098];
-
-  int keyservfd, acceptfd;
-  fd_set readfds;
-
-  keyservfd = keyservsock ();
-
-  acceptfd = terminal_socket ();
-  if (acceptfd < 0)
-    exit (-1);
-
-  FD_ZERO (&readfds);
-  FD_SET (keyservfd, &readfds);
-  FD_SET (acceptfd, &readfds);
-
-  while (1)
-    {
-      ret = recvfrom (keyservfd, buf, sizeof (buf), 0,
-                      (struct sockaddr *) &caddr, &caddr_len);
-      if (ret < 0)
-        {
-          fprintf (stderr, "recvfrom() failed: %s\n", strerror (errno));
-          close (keyservfd);
-          exit (-1);
-        }
-
-      fprintf (stdout, "recvfrom %s:%d\n",
-               inet_ntoa (caddr.sin_addr), ntohs (caddr.sin_port));
-    }
+  //thread_master_delete (master);
 
   return 0;
 }

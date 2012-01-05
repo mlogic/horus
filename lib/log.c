@@ -251,4 +251,31 @@ log_mesg (int priority, char *message, ...)
 #endif /*ENABLE_SYSLOG*/
 }
 
+void
+log_error (char *message, ...)
+{
+#ifdef ENABLE_SYSLOG
+  va_list ap_syslog;
+#endif /*ENABLE_SYSLOG*/
+#ifdef ENABLE_STDERR
+  va_list ap_stderr;
+  pid_t pid;
+#endif /*ENABLE_STDERR*/
+
+  if (! log_on)
+    log_init ();
+
+#ifdef ENABLE_STDERR
+  pid = getpid ();
+  va_start (ap_stderr, message);
+  fprintf (stderr, "pid: %d: ", (int) pid);
+  vfprintf (stderr, message, ap_stderr);
+  va_end (ap_stderr);
+#endif /*ENABLE_STDERR*/
+#ifdef ENABLE_SYSLOG
+  va_start (ap_syslog, message);
+  vsyslog (LOG_ERR, message, ap_syslog);
+  va_end (ap_syslog);
+#endif /*ENABLE_SYSLOG*/
+}
 
