@@ -25,6 +25,7 @@ libtool
 
 src/test-shell
 src/test-command-shell
+src/test-pthread
 
 src/horus-key
 src/horus-kds
