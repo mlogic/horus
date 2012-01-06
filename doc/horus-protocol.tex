@@ -5,7 +5,7 @@
 
 \newcommand{\mds}{\ensuremath{\mathit{MDS}}}
 \newcommand{\kds}{\ensuremath{\mathit{KDS}}}
-
+\newcommand{\osd}{\ensuremath{\mathit{OSD}}}
 
 \begin{document}
 
@@ -75,28 +75,32 @@ or extended attributes (or "\textit{forks}") in other file systems.
    (bs,d,i,j) & : & \mbox{block size $bs$, depth $d$, range $i,j$.} \\
 \end{eqnarray*}
 
+\clearpage
+
 Resulting key exchange protocol in Horus is as follows.
 
-Key exchange in read request:
+User $A$ registers file attributes in extended attributes
+in filesystem or in $\mds$. $A$ also registers $KR_A$ in $\kds$.
+
 \begin{eqnarray}
-  C \rightarrow \kds & : & \mbox{open request} \\
-  \kds \rightarrow \mds & : & \mbox{request: file path, } C \\
-  \mds \rightarrow \kds & : & \mbox{range attributes: }
-    \{ bs,d,C,i,j,E_{KU_A}(K_R) \} \\
-  \kds & : & \mbox{key calculation for } C \\
-  \kds \rightarrow C & : & K_{i,j} \\
-  C \rightarrow OSD & : & \mbox{file access (read/write)} \\
-  C & : & \mbox{decrypt data}
+A \rightarrow \mds & : & \{ path, bs, d, E_{KU_A}(K_R) \} \\
+A \rightarrow \mds & : & \{ path, C_1, i_1, j_1 \} \\
+A \rightarrow \mds & : & \{ path, C_2, i_2, j_2 \} \\
+A \rightarrow \kds & : & KR_A
 \end{eqnarray}
 
-\begin{tabular}{l}
-  $A@\kds$\verb+% horus-config public-key +$KU_A$ \\
-  $A@\kds$\verb+% horus-config private-key +$KR_A$ \\
-  $A@\kds$\verb+% horus-config file +\textit{path}\verb+ master-key +$K_R$ \\
-  $A@\kds$\verb+% horus-config file +\textit{path}\verb+ block-size +$bs$ \\
-  $A@\kds$\verb+% horus-config file +\textit{path}\verb+ key-tree-depth +$d$ \\
-  $A@\kds$\verb+% horus-config file +\textit{path}\verb+ client +$C$\verb+ allowed-block +$i,j$
-\end{tabular}
+Computing node $C_2$ accesses the file data through the intervention
+by $\kds$.
+
+\begin{eqnarray}
+C_2 \rightarrow \kds & : & \mbox{open request: } \{ path \} \\
+\kds \rightarrow \mds & : & \mbox{attr request: } \{ path,C_2 \} \\
+\mds \rightarrow \kds & : & \mbox{attr response: } \{ path,bs,d,E_{KU_A}(K_R),C_2,i_2,j_2 \} \\
+\kds         & : & K_{i_2,j_2} \leftarrow E_{KU_A}(K_R) \times KR_A \\
+\kds \rightarrow C_2 & : & \{ path, bs, d, i_2, j_2, K_{i_2,j_2} \} \\
+C_2 \rightarrow \osd & : & \mbox{data request} \\
+\osd \rightarrow C_2 & : & \mbox{data, then decrypted by } K_{i_2,j_2}
+\end{eqnarray}
 
 \end{document}
 
