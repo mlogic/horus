@@ -20,6 +20,8 @@ EXTERN_COMMAND (logout);
 EXTERN_COMMAND (enable_shell_debugging);
 EXTERN_COMMAND (disable_shell_debugging);
 
+EXTERN_COMMAND (show_history);
+
 struct command_shell *command_shell_create ();
 void command_shell_delete (struct command_shell *csh);
 

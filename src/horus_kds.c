@@ -88,7 +88,7 @@ struct kdb_entry
 struct thread_master *master = NULL;
 struct vectorx *kdb = NULL;
 
-DEFINE_COMMAND (show_thread_info,
+DEFINE_COMMAND (show_thread,
                 "show thread",
                 "show\n"
                 "show thread information.\n")
@@ -229,7 +229,11 @@ terminal_service (void *arg)
   char dont_linemode[] = { IAC, DONT, TELOPT_LINEMODE, '\0' };
 
   shell = command_shell_create ();
-  INSTALL_COMMAND (shell->cmdset, show_thread_info);
+  shell_install (shell->shell, CONTROL('C'), NULL);
+  shell_history_enable (shell->shell);
+  INSTALL_COMMAND (shell->cmdset, show_history);
+
+  INSTALL_COMMAND (shell->cmdset, show_thread);
   INSTALL_COMMAND (shell->cmdset, show_user_key);
   INSTALL_COMMAND (shell->cmdset, user_key);
   INSTALL_COMMAND (shell->cmdset, no_user_key);
@@ -245,6 +249,8 @@ terminal_service (void *arg)
 
   while (command_shell_running (shell))
     command_shell_run (shell);
+
+  shell_history_disable (shell->shell);
 
   command_shell_delete (shell);
 

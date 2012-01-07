@@ -30,23 +30,6 @@ termio_finish ()
   tcsetattr (0, TCSANOW, &oterm);
 }
 
-void
-shell_history_keyfunc_ctrl_j (struct shell *shell)
-{
-  if (shell->history)
-    shell_history_add (shell->command_line, shell->history);
-  command_shell_execute (shell);
-}
-
-DEFINE_COMMAND (show_history,
-                "show history",
-                "show\n"
-                "show command-line history\n")
-{
-  struct command_shell *csh = (struct command_shell *) context;
-  shell_history_show (csh->shell);
-}
-
 int
 main (int argc, char **argv)
 {
@@ -58,8 +41,6 @@ main (int argc, char **argv)
   shell_history_enable (shell->shell);
   shell_set_terminal (shell->shell, 0, 1);
   shell_install (shell->shell, CONTROL('C'), NULL);
-  shell_install (shell->shell, CONTROL('J'), shell_history_keyfunc_ctrl_j);
-  INSTALL_COMMAND (shell->cmdset, show_history);
 
   command_shell_start (shell);
 

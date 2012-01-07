@@ -45,6 +45,9 @@ shell_history_add (char *line, struct shell_history *history)
   if (! strlen (line))
     return;
 
+  if (history->vector->size >= 1024)
+    return;
+
   dup = strdup (line);
   vectorx_add (dup, history->vector);
   history->index = history->vector->size;

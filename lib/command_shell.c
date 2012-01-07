@@ -3,6 +3,7 @@
  */
 
 #include <command_shell.h>
+#include <shell_history.h>
 
 DEFINE_COMMAND (exit,
                 "exit",
@@ -37,6 +38,15 @@ DEFINE_COMMAND (disable_shell_debugging,
   struct command_shell *csh = (struct command_shell *) context;
   shell_printf (csh->shell, "disable shell debugging.");
   FLAG_CLEAR (csh->shell->flag, SHELL_FLAG_DEBUG);
+}
+
+DEFINE_COMMAND (show_history,
+                "show history",
+                "show\n"
+                "show command-line history\n")
+{
+  struct command_shell *csh = (struct command_shell *) context;
+  shell_history_show (csh->shell);
 }
 
 void
@@ -185,6 +195,14 @@ command_shell_ls_candidate (struct shell *shell)
 }
 
 void
+command_shell_keyfunc_ctrl_j (struct shell *shell)
+{
+  if (shell->history)
+    shell_history_add (shell->command_line, shell->history);
+  command_shell_execute (shell);
+}
+
+void
 command_shell_install_default (struct command_shell *csh)
 {
   INSTALL_COMMAND (csh->cmdset, exit);
@@ -208,8 +226,8 @@ command_shell_create ()
   command_shell_install_default (csh);
 
   csh->shell = shell_create ();
-  shell_install (csh->shell, CONTROL('J'), command_shell_execute);
-  shell_install (csh->shell, CONTROL('M'), command_shell_execute);
+  shell_install (csh->shell, CONTROL('J'), command_shell_keyfunc_ctrl_j);
+  shell_install (csh->shell, CONTROL('M'), command_shell_keyfunc_ctrl_j);
   shell_install (csh->shell, CONTROL('I'), command_shell_completion);
   shell_install (csh->shell, '?', command_shell_ls_candidate);
   csh->shell->context = csh;
