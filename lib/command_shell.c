@@ -71,7 +71,6 @@ command_shell_execute (struct shell *shell)
   ret = command_execute (shell->command_line, csh->cmdset, csh);
   if (ret < 0)
     shell_printf (shell, "no such command: %s", shell->command_line);
-  //command_history_add (shell->command_line, shell->history, shell);
 
   /* FILE buffer must be flushed before raw-writing the same file */
   fflush (shell->terminal);
@@ -213,8 +212,6 @@ command_shell_create ()
   shell_install (csh->shell, CONTROL('M'), command_shell_execute);
   shell_install (csh->shell, CONTROL('I'), command_shell_completion);
   shell_install (csh->shell, '?', command_shell_ls_candidate);
-  //shell_install (csh->shell, CONTROL('P'), command_history_prev);
-  //shell_install (csh->shell, CONTROL('N'), command_history_next);
   csh->shell->context = csh;
 
   return csh;
@@ -224,7 +221,6 @@ void
 command_shell_delete (struct command_shell *csh)
 {
   command_set_delete (csh->cmdset);
-  //command_history_delete (shell->history);
   shell_delete (csh->shell);
   free (csh);
 }

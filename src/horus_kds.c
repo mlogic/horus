@@ -2,6 +2,7 @@
 #include <horus.h>
 
 #include <thread.h>
+#include <network.h>
 
 #define HORUS_KEY_SERVER_PORT 6666
 #define HORUS_KDS_TERMINAL_PORT 6667
@@ -78,104 +79,18 @@ struct horus_key_response
   struct horus_key key;
 };
 
-int
-server_socket (int domain, int type, u_int16_t port, char *service_name)
+struct kdb_entry
 {
-  int fd;
-  int ret;
-  struct sockaddr_in saddr;
-  const int on = 1;
-  char *dname, *tname;
-
-  switch (domain)
-    {
-    case PF_INET:
-      dname = "inet";
-      break;
-    default:
-      dname = "other";
-      break;
-    }
-
-  switch (type)
-    {
-    case SOCK_STREAM:
-      tname = "tcp";
-      break;
-    case SOCK_DGRAM:
-      tname = "udp";
-      break;
-    default:
-      tname = "other";
-      break;
-    }
-
-  fd = socket (domain, type, 0);
-  if (fd < 0)
-    {
-      fprintf (stderr, "socket(%s, %s) failed: %s\n",
-               dname, tname, strerror (errno));
-      return -1;
-    }
-
-  ret = setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (on));
-  if (ret < 0)
-    {
-      fprintf (stderr, "setsockopt(SO_REUSEADDR) failed: %s\n",
-               strerror (errno));
-      /* continue. */
-    }
-
-  if (domain == PF_INET)
-    {
-      memset (&saddr, 0, sizeof (saddr));
-      saddr.sin_family = AF_INET;
-      saddr.sin_port = htons (port);
-      saddr.sin_addr.s_addr = htonl (INADDR_ANY);
-
-      ret = bind (fd, (struct sockaddr *) &saddr, sizeof (saddr));
-      if (ret < 0)
-        {
-          fprintf (stderr, "bind() failed: %s\n", strerror (errno));
-          close (fd);
-          return -1;
-        }
-    }
-
-  if (type == SOCK_STREAM)
-    {
-      ret = listen (fd, 5);
-      if (ret < 0)
-        {
-          fprintf (stderr, "listen() failed: %s\n", strerror (errno));
-          close (fd);
-          return -1;
-        }
-    }
-
-  fprintf (stderr, "listening for %s service on %s %s port %hu.\n",
-           service_name, dname, tname, port);
-
-  return fd;
-}
-
-void
-terminal_setting (struct command_shell *shell)
-{
-  char will_echo[] =              { IAC, WILL, TELOPT_ECHO, '\0' };
-  char will_suppress_go_ahead[] = { IAC, WILL, TELOPT_SGA, '\0' };
-  char dont_linemode[] =          { IAC, DONT, TELOPT_LINEMODE, '\0' };
-  write (shell->shell->writefd, will_echo, 3);
-  write (shell->shell->writefd, will_suppress_go_ahead, 3);
-  write (shell->shell->writefd, dont_linemode, 3);
-}
+  char *username;
+  char *private_key;
+};
 
 struct thread_master *master = NULL;
+struct vectorx *kdb = NULL;
 
 DEFINE_COMMAND (show_thread_info,
-                "show thread information",
+                "show thread",
                 "show\n"
-                "show thread information.\n"
                 "show thread information.\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
@@ -187,9 +102,10 @@ DEFINE_COMMAND (show_thread_info,
     THREAD_STATE_RUNNING, THREAD_STATE_ENDING);
   for (i = 0; i < master->nthreads; i++)
     {
-      shell_printf (csh->shell, "thread[%d]: index: %d, state: %d, func: %s",
-                    i, master->threads[i].index, master->threads[i].state,
-                    master->threads[i].name);
+      if (master->threads[i].state != THREAD_STATE_RELEASED)
+        shell_printf (csh->shell, "thread[%d]: index: %d, state: %d, func: %s",
+                      i, master->threads[i].index, master->threads[i].state,
+                      master->threads[i].name);
     }
 }
 
@@ -199,18 +115,106 @@ DEFINE_COMMAND (show_user_key,
                 "show user's key information.\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
+  struct vectorx_node *n;
+  struct kdb_entry *entry;
+
+  for (n = vectorx_head (kdb); n; n = vectorx_next (n))
+    {
+      entry = (struct kdb_entry *) n->data;
+      shell_printf (csh->shell, "user-key user %s private-key %s",
+                    entry->username, entry->private_key);
+    }
 }
 
-DEFINE_COMMAND (set_user_key,
-                "set user-key user USERNAME key VALUE",
-                "set\n"
-                "set user's key information.\n"
+struct kdb_entry *
+kdb_create (char *username, char *private_key)
+{
+  struct kdb_entry *entry;
+
+  entry = (struct kdb_entry *) malloc (sizeof (struct kdb_entry));
+  assert (entry);
+  memset (entry, 0, sizeof (struct kdb_entry));
+
+  entry->username = strdup (username);
+  entry->private_key = strdup (private_key);
+
+  return entry;
+}
+
+void
+kdb_delete (struct kdb_entry *entry)
+{
+  free (entry->username);
+  free (entry->private_key);
+  free (entry);
+}
+
+int
+kdb_compare (const void *a, const void *b)
+{
+  int ret;
+  struct kdb_entry *ka = *(struct kdb_entry **) a;
+  struct kdb_entry *kb = *(struct kdb_entry **) b;
+
+  fprintf (stderr, "debug: ka: (%s, %s)\n", ka->username, ka->private_key);
+  fprintf (stderr, "debug: kb: (%s, %s)\n", kb->username, kb->private_key);
+
+  ret = strcmp (ka->username, kb->username);
+  fprintf (stderr, "debug: return %d\n", ret);
+
+  return ret;
+}
+
+DEFINE_COMMAND (user_key,
+                "user-key user USERNAME private-key VALUE",
+                "user's key information.\n"
                 "specify username\n"
                 "specify username\n"
-                "specify key value\n"
+                "specify private-key\n"
                 "specify key value\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
+  struct kdb_entry *request, *exist;
+
+  request = kdb_create (argv[2], argv[4]);
+  exist = vectorx_lookup_bsearch (request, kdb_compare, kdb);
+  if (exist)
+    {
+      free (exist->private_key);
+      exist->private_key = strdup (argv[4]);
+      kdb_delete (request);
+      shell_printf (csh->shell, "user %s's private-key modified.",
+                    exist->username);
+    }
+  else
+    {
+      vectorx_add (request, kdb);
+      vectorx_sort (kdb_compare, kdb);
+      shell_printf (csh->shell, "user %s's private-key added.",
+                    request->username);
+    }
+}
+
+DEFINE_COMMAND (no_user_key,
+                "no user-key user USERNAME",
+                "negate\n"
+                "delete user's key information.\n"
+                "specify username\n"
+                "specify username\n")
+{
+  struct command_shell *csh = (struct command_shell *) context;
+  struct kdb_entry *request, *exist;
+
+  request = kdb_create (argv[3], "dummy");
+  exist = vectorx_lookup_bsearch (request, kdb_compare, kdb);
+  if (exist)
+    {
+      vectorx_remove (exist, kdb);
+      kdb_delete (exist);
+      shell_printf (csh->shell, "user %s's private-key deleted.",
+                    request->username);
+    }
+  kdb_delete (request);
 }
 
 void *
@@ -219,13 +223,24 @@ terminal_service (void *arg)
   struct thread *thread = (struct thread *) arg;
   struct command_shell *shell;
 
+  /* telnet options. */
+  char will_echo[] = { IAC, WILL, TELOPT_ECHO, '\0' };
+  char will_suppress_go_ahead[] = { IAC, WILL, TELOPT_SGA, '\0' };
+  char dont_linemode[] = { IAC, DONT, TELOPT_LINEMODE, '\0' };
+
   shell = command_shell_create ();
   INSTALL_COMMAND (shell->cmdset, show_thread_info);
   INSTALL_COMMAND (shell->cmdset, show_user_key);
-  INSTALL_COMMAND (shell->cmdset, set_user_key);
+  INSTALL_COMMAND (shell->cmdset, user_key);
+  INSTALL_COMMAND (shell->cmdset, no_user_key);
 
   shell_set_terminal (shell->shell, thread->readfd, thread->writefd);
-  terminal_setting (shell);
+
+  /* send telnet options. */
+  write (shell->shell->writefd, will_echo, 3);
+  write (shell->shell->writefd, will_suppress_go_ahead, 3);
+  write (shell->shell->writefd, dont_linemode, 3);
+
   command_shell_start (shell);
 
   while (command_shell_running (shell))
@@ -306,13 +321,18 @@ terminal_init ()
 int
 main (int argc, char **argv)
 {
+
 #define THREAD_MAX 16
   master = thread_master_create (THREAD_MAX);
+
+  kdb = vectorx_create ();
 
   terminal_init ();
 
   while (thread_running (master))
     thread_run (master);
+
+  vectorx_delete (kdb);
 
   thread_master_delete (master);
 

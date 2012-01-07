@@ -603,6 +603,13 @@ shell_keyfunc_ctrl_e (struct shell *shell)
 }
 
 void
+shell_keyfunc_ctrl_c (struct shell *shell)
+{
+  FLAG_SET (shell->flag, SHELL_FLAG_EXIT);
+  shell_close (shell);
+}
+
+void
 shell_keyfunc_ctrl_d (struct shell *shell)
 {
   /* Delete one character */
@@ -698,7 +705,7 @@ shell_keyfunc_t default_key_func[] =
   NULL,                    /* Function for CONTROL('@') */
   shell_keyfunc_ctrl_a,    /* Function for CONTROL('A') */
   shell_keyfunc_ctrl_b,    /* Function for CONTROL('B') */
-  NULL,                    /* Function for CONTROL('C') */
+  shell_keyfunc_ctrl_c,    /* Function for CONTROL('C') */
   shell_keyfunc_ctrl_d,    /* Function for CONTROL('D') */
   shell_keyfunc_ctrl_e,    /* Function for CONTROL('E') */
   shell_keyfunc_ctrl_f,    /* Function for CONTROL('F') */
@@ -829,7 +836,7 @@ shell_keyfunc_t default_key_func[] =
   NULL,                    /* Function for Key('|') */
   NULL,                    /* Function for Key('}') */
   NULL,                    /* Function for Key('~') */
-  shell_keyfunc_ctrl_d,    /* Function for DEL */
+  shell_keyfunc_ctrl_h,    /* Function for DEL */
 };
 
 
@@ -992,6 +999,12 @@ shell_install (struct shell *shell, unsigned char key,
   shell->key_func[key] = func;
 }
 
+void
+shell_start (struct shell *shell)
+{
+  shell_prompt (shell);
+}
+
 int
 shell_running (struct shell *shell)
 {
@@ -999,5 +1012,11 @@ shell_running (struct shell *shell)
       FLAG_CHECK (shell->flag, SHELL_FLAG_CLOSE))
     return 0;
   return 1;
+}
+
+void
+shell_run (struct shell *shell)
+{
+  shell_read (shell);
 }
 

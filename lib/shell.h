@@ -46,6 +46,7 @@ struct shell
   shell_keyfunc_t key_func[128];
 
   void *context;
+  void *history;
 };
 
 #define SHELL_FLAG_ESCAPE    0x01
@@ -95,7 +96,9 @@ void shell_set_prompt (struct shell *shell, char *prompt);
 void shell_install (struct shell *shell, unsigned char key,
                     shell_keyfunc_t func);
 
+void shell_start (struct shell *shell);
 int shell_running (struct shell *shell);
+void shell_run (struct shell *shell);
 
 #endif /*_SHELL_H_*/
 
