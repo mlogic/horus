@@ -61,7 +61,7 @@ key_to_string (char *buf, int size, char *key, int key_len)
   len = 0;
   for (i = 0; i < key_len; i++)
     {
-      if (size - 1 <= len)
+      if (size - len <= 1)
         break;
 
       val0 = ((unsigned char) key[i] & 0xf0) >> 4;
@@ -71,7 +71,7 @@ key_to_string (char *buf, int size, char *key, int key_len)
         buf[len] = 'a' + (val0 - 10);
       len++;
 
-      if (size - 1 <= len)
+      if (size - len <= 1)
         break;
 
       val1 = (unsigned char) key[i] & 0x0f;
@@ -82,7 +82,8 @@ key_to_string (char *buf, int size, char *key, int key_len)
       len++;
     }
 
-  buf[len] = '\0';
+  if (size - len > 0)
+    buf[len] = '\0';
 }
 
 char *
@@ -113,9 +114,9 @@ block_key (char *key, int *key_len,
 
   if (debug)
     {
-      print_hex ("parent = ", parent, parent_len);
+      printf ("parent = %s\n", print_key (parent, parent_len));
       printf ("x: %d, y: %d, message: %s, size: %d\n", x, y, x__y, size);
-      print_hex ("message = ", x__y, size);
+      printf ("message = %s\n", print_key (x__y, size));
     }
 
 #ifdef __APPLE__
@@ -129,7 +130,7 @@ block_key (char *key, int *key_len,
 #endif /*__APPLE__*/
 
   if (debug)
-    print_hex ("key = ", key, *key_len);
+    printf ("key = %s\n", print_key (key, *key_len));
 
   return key;
 }

@@ -28,6 +28,7 @@ open (const char *path, int oflag, ...)
   return fd;
 }
 
+#ifdef SYS_socket
 int
 socket (int domain, int type, int protocol)
 {
@@ -38,6 +39,7 @@ socket (int domain, int type, int protocol)
 
   return fd;
 }
+#endif /*SYS_socket*/
 
 ssize_t
 read (int fd, void *buf, size_t size)

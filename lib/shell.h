@@ -43,7 +43,7 @@ struct shell
   int size;    /* buffer size of command_line[] */
   char *cut_buffer;
 
-  shell_keyfunc_t key_func[128];
+  shell_keyfunc_t key_func[256];
 
   void *context;
   void *history;

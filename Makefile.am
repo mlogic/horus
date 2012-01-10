@@ -1,7 +1,7 @@
 
 SUBDIRS = lib src etc
 
-AM_CPPFLAGS = -I$(top_srcdir)/lib
+# AM_CPPFLAGS = -I$(top_srcdir)/lib @PTHREAD_CFLAGS@
 
 ACLOCAL_AMFLAGS = -I m4
 
