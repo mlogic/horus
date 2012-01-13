@@ -2,7 +2,7 @@
 AM_CPPFLAGS = -I$(top_srcdir)/lib
 AM_LDFLAGS = -L$(top_srcdir)/lib @OPENSSL_LIBS@
 
-noinst_PROGRAMS = test-shell test-command-shell test-pthread
+noinst_PROGRAMS = test-shell test-command-shell test-pthread test-openssl
 test_shell_SOURCES = test_shell.c
 test_shell_LDADD = ../lib/libhorus.la
 test_command_shell_SOURCES = test_command_shell.c
@@ -10,6 +10,8 @@ test_command_shell_LDADD = ../lib/libhorus.la
 test_pthread_SOURCES = test_pthread.c
 test_pthread_CFLAGS = @PTHREAD_CFLAGS@
 test_pthread_LDADD = @PTHREAD_LIBS@
+test_openssl_SOURCES = test_openssl.c
+test_openssl_LDADD = @OPENSSL_LIBS@
 
 bin_PROGRAMS = horus-key
 horus_key_SOURCES = horus_key.c
