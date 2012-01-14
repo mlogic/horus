@@ -1,8 +1,15 @@
 
 #include <horus.h>
 
+#include <log.h>
+#include <shell.h>
+#include <shell_history.h>
+#include <command.h>
+#include <command_shell.h>
 #include <thread.h>
 #include <network.h>
+#include <terminal.h>
+#include <openssl.h>
 
 #define HORUS_KEY_SERVER_PORT 6666
 #define HORUS_KDS_TERMINAL_PORT 6667
@@ -82,7 +89,8 @@ struct horus_key_response
 struct kdb_entry
 {
   char *username;
-  char *private_key;
+  char *filename;
+  EVP_PKEY *private_key;
 };
 
 struct thread_master *master = NULL;
@@ -100,12 +108,16 @@ DEFINE_COMMAND (show_thread,
     "state: NONE:%d, RELEASED: %d, RUNNING:%d, ENDING:%d",
     THREAD_STATE_NONE, THREAD_STATE_RELEASED,
     THREAD_STATE_RUNNING, THREAD_STATE_ENDING);
+  shell_linefeed (csh->shell);
   for (i = 0; i < master->nthreads; i++)
     {
-      if (master->threads[i].state != THREAD_STATE_RELEASED)
-        shell_printf (csh->shell, "thread[%d]: index: %d, state: %d, func: %s",
-                      i, master->threads[i].index, master->threads[i].state,
-                      master->threads[i].name);
+      if (master->threads[i].state == THREAD_STATE_RELEASED)
+        continue;
+
+      shell_printf (csh->shell, "thread[%d]: index: %d, state: %d, func: %s",
+                    i, master->threads[i].index, master->threads[i].state,
+                    master->threads[i].name);
+      shell_linefeed (csh->shell);
     }
 }
 
@@ -117,17 +129,27 @@ DEFINE_COMMAND (show_user_key,
   struct command_shell *csh = (struct command_shell *) context;
   struct vectorx_node *n;
   struct kdb_entry *entry;
+  //int ret;
 
   for (n = vectorx_head (kdb); n; n = vectorx_next (n))
     {
       entry = (struct kdb_entry *) n->data;
       shell_printf (csh->shell, "user-key user %s private-key %s",
-                    entry->username, entry->private_key);
+                    entry->username, entry->filename);
+      shell_linefeed (csh->shell);
+
+#if 0
+      ret = PEM_write_PrivateKey (csh->shell->terminal,
+        entry->private_key, NULL, NULL, 0, 0, NULL);
+      if (ret == 0)
+        shell_printf (csh->shell, "failed to display private key.");
+      shell_linefeed (csh->shell);
+#endif /*0*/
     }
 }
 
 struct kdb_entry *
-kdb_create (char *username, char *private_key)
+kdb_create (char *username, char *filename)
 {
   struct kdb_entry *entry;
 
@@ -136,7 +158,8 @@ kdb_create (char *username, char *private_key)
   memset (entry, 0, sizeof (struct kdb_entry));
 
   entry->username = strdup (username);
-  entry->private_key = strdup (private_key);
+  entry->filename = strdup (filename);
+  entry->private_key = NULL;
 
   return entry;
 }
@@ -145,7 +168,9 @@ void
 kdb_delete (struct kdb_entry *entry)
 {
   free (entry->username);
-  free (entry->private_key);
+  free (entry->filename);
+  if (entry->private_key)
+    EVP_PKEY_free (entry->private_key);
   free (entry);
 }
 
@@ -156,8 +181,8 @@ kdb_compare (const void *a, const void *b)
   struct kdb_entry *ka = *(struct kdb_entry **) a;
   struct kdb_entry *kb = *(struct kdb_entry **) b;
 
-  fprintf (stderr, "debug: ka: (%s, %s)\n", ka->username, ka->private_key);
-  fprintf (stderr, "debug: kb: (%s, %s)\n", kb->username, kb->private_key);
+  fprintf (stderr, "debug: ka: (%s, %s)\n", ka->username, ka->filename);
+  fprintf (stderr, "debug: kb: (%s, %s)\n", kb->username, kb->filename);
 
   ret = strcmp (ka->username, kb->username);
   fprintf (stderr, "debug: return %d\n", ret);
@@ -166,32 +191,59 @@ kdb_compare (const void *a, const void *b)
 }
 
 DEFINE_COMMAND (user_key,
-                "user-key user USERNAME private-key VALUE",
+                "user-key user USERNAME private-key PATH",
                 "user's key information.\n"
                 "specify username\n"
                 "specify username\n"
                 "specify private-key\n"
-                "specify key value\n")
+                "specify file path\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
   struct kdb_entry *request, *exist;
+  EVP_PKEY *pkey;
+
+  pkey = openssl_load_private_key (argv[4], NULL);
+  if (pkey == NULL)
+    {
+      shell_printf (csh->shell, "Cannot load private key file: %s", argv[4]);
+      shell_linefeed (csh->shell);
+      return;
+    }
 
   request = kdb_create (argv[2], argv[4]);
+  assert (request);
+
   exist = vectorx_lookup_bsearch (request, kdb_compare, kdb);
   if (exist)
     {
-      free (exist->private_key);
-      exist->private_key = strdup (argv[4]);
+      /* replace filename */
+      free (exist->filename);
+      exist->filename = strdup (argv[4]);
+
+      /* replace key */
+      if (exist->private_key)
+        EVP_PKEY_free (exist->private_key);
+      exist->private_key = pkey;
+
+      /* delete request */
       kdb_delete (request);
+
       shell_printf (csh->shell, "user %s's private-key modified.",
                     exist->username);
+      shell_linefeed (csh->shell);
     }
   else
     {
+      /* set private key */
+      request->private_key = pkey;
+
+      /* add to the kdb */
       vectorx_add (request, kdb);
       vectorx_sort (kdb_compare, kdb);
+
       shell_printf (csh->shell, "user %s's private-key added.",
                     request->username);
+      shell_linefeed (csh->shell);
     }
 }
 
@@ -213,127 +265,35 @@ DEFINE_COMMAND (no_user_key,
       kdb_delete (exist);
       shell_printf (csh->shell, "user %s's private-key deleted.",
                     request->username);
+      shell_linefeed (csh->shell);
     }
   kdb_delete (request);
 }
 
-void *
-terminal_service (void *arg)
-{
-  struct thread *thread = (struct thread *) arg;
-  struct command_shell *shell;
-
-  /* telnet options. */
-  char will_echo[] = { IAC, WILL, TELOPT_ECHO, '\0' };
-  char will_suppress_go_ahead[] = { IAC, WILL, TELOPT_SGA, '\0' };
-  char dont_linemode[] = { IAC, DONT, TELOPT_LINEMODE, '\0' };
-
-  shell = command_shell_create ();
-  shell_install (shell->shell, CONTROL('C'), NULL);
-  shell_history_enable (shell->shell);
-  INSTALL_COMMAND (shell->cmdset, show_history);
-
-  INSTALL_COMMAND (shell->cmdset, show_thread);
-  INSTALL_COMMAND (shell->cmdset, show_user_key);
-  INSTALL_COMMAND (shell->cmdset, user_key);
-  INSTALL_COMMAND (shell->cmdset, no_user_key);
-
-  shell_set_terminal (shell->shell, thread->readfd, thread->writefd);
-
-  /* send telnet options. */
-  write (shell->shell->writefd, will_echo, 3);
-  write (shell->shell->writefd, will_suppress_go_ahead, 3);
-  write (shell->shell->writefd, dont_linemode, 3);
-
-  command_shell_start (shell);
-
-  while (command_shell_running (shell))
-    command_shell_run (shell);
-
-  shell_history_disable (shell->shell);
-
-  command_shell_delete (shell);
-
-  fprintf (stderr, "thread[%d]: terminal service closed.\n", thread->index);
-  thread_release (thread);
-
-  return NULL;
-}
-
-void *
-terminal_accept (void *arg)
-{
-  struct thread *thread = (struct thread *) arg;
-  struct thread *t;
-
-  int acceptfd, fd;
-  struct sockaddr_in saddr;
-  socklen_t saddr_len;
-  char saddr_name[64];
-
-  acceptfd = thread->readfd;
-
-  while (1)
-    {
-      saddr_len = sizeof (struct sockaddr_in);
-      fd = accept (acceptfd, (struct sockaddr *) &saddr, &saddr_len);
-      if (fd < 0)
-        {
-          log_error ("accept() failed: %s\n", strerror (errno));
-          return NULL;
-        }
-
-      inet_ntop (AF_INET, &saddr.sin_addr, saddr_name, sizeof (saddr_name));
-      fprintf (stderr, "thread[%d]: accept connection from %s:%d.\n",
-               thread->index, saddr_name, saddr.sin_port);
-
-      t = thread_get (master);
-      assert (t);
-      t->func = terminal_service;
-      t->name = "terminal_service";
-      t->readfd = fd;
-      t->writefd = fd;
-      t->arg = NULL;
-
-      fprintf (stderr, "thread[%d]: terminal service for %s:%d on fd %d.\n",
-               t->index, saddr_name, saddr.sin_port, fd);
-
-      thread_add_read (t);
-    }
-
-  thread_release (thread);
-  return NULL;
-}
-
 void
-terminal_init ()
+horus_kds_install_commands (struct command_set *cmdset)
 {
-  int fd;
-  struct thread *t;
-
-  fd = server_socket (PF_INET, SOCK_STREAM,
-                      HORUS_KDS_TERMINAL_PORT, "terminal");
-
-  t = thread_get (master);
-  assert (t);
-  t->func = terminal_accept;
-  t->name = "terminal_accept";
-  t->readfd = fd;
-  t->writefd = fd;
-  t->arg = NULL;
-  thread_add_read (t);
+  INSTALL_COMMAND (cmdset, show_thread);
+  INSTALL_COMMAND (cmdset, show_user_key);
+  INSTALL_COMMAND (cmdset, user_key);
+  INSTALL_COMMAND (cmdset, no_user_key);
 }
 
 int
 main (int argc, char **argv)
 {
+  int fd;
 
 #define THREAD_MAX 16
   master = thread_master_create (THREAD_MAX);
 
   kdb = vectorx_create ();
 
-  terminal_init ();
+  fd = server_socket (PF_INET, SOCK_STREAM,
+                      HORUS_KDS_TERMINAL_PORT, "terminal");
+
+  terminal_init (master, fd);
+  terminal_install_commands = horus_kds_install_commands;
 
   while (thread_running (master))
     thread_run (master);

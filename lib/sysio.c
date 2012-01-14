@@ -1,6 +1,8 @@
 
 #include <horus.h>
 
+#include <log.h>
+
 int
 open (const char *path, int oflag, ...)
 {

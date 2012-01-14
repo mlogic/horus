@@ -17,5 +17,7 @@ void shell_history_next (struct shell *shell, struct shell_history *history);
 void shell_history_enable (struct shell *shell);
 void shell_history_disable (struct shell *shell);
 
+void shell_history_show (struct shell *shell);
+
 #endif /*_SHELL_HISTORY_H_*/
 

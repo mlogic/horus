@@ -11,6 +11,7 @@ DEFINE_COMMAND (exit,
 {
   struct command_shell *csh = (struct command_shell *) context;
   shell_printf (csh->shell, "exit !");
+  shell_linefeed (csh->shell);
   FLAG_SET (csh->shell->flag, SHELL_FLAG_EXIT);
   shell_close (csh->shell);
 }
@@ -26,6 +27,7 @@ DEFINE_COMMAND (enable_shell_debugging,
 {
   struct command_shell *csh = (struct command_shell *) context;
   shell_printf (csh->shell, "enable shell debugging.");
+  shell_linefeed (csh->shell);
   FLAG_SET (csh->shell->flag, SHELL_FLAG_DEBUG);
 }
 
@@ -37,6 +39,7 @@ DEFINE_COMMAND (disable_shell_debugging,
 {
   struct command_shell *csh = (struct command_shell *) context;
   shell_printf (csh->shell, "disable shell debugging.");
+  shell_linefeed (csh->shell);
   FLAG_CLEAR (csh->shell->flag, SHELL_FLAG_DEBUG);
 }
 
@@ -80,7 +83,10 @@ command_shell_execute (struct shell *shell)
 
   ret = command_execute (shell->command_line, csh->cmdset, csh);
   if (ret < 0)
-    shell_printf (shell, "no such command: %s", shell->command_line);
+    {
+      shell_printf (shell, "no such command: %s", shell->command_line);
+      shell_linefeed (csh->shell);
+    }
 
   /* FILE buffer must be flushed before raw-writing the same file */
   fflush (shell->terminal);
@@ -172,14 +178,20 @@ command_shell_ls_candidate (struct shell *shell)
     {
       /* if the fixed_part is executable, print <cr> with its helpstr */
       if (last_word_index == shell->cursor && match->func)
-        shell_printf (shell, "  %-16s %s", "<cr>", match->helpstr);
+        {
+          shell_printf (shell, "  %-16s %s", "<cr>", match->helpstr);
+          shell_linefeed (shell);
+        }
 
       /* show candidates in current node */
       for (vn = vectorx_head (match->cmdvec); vn; vn = vectorx_next (vn))
         {
           node = (struct command_node *) vn->data;
           if (is_command_match (node->cmdstr, last_word))
-            shell_printf (shell, "  %-16s %s", node->cmdstr, node->helpstr);
+            {
+              shell_printf (shell, "  %-16s %s", node->cmdstr, node->helpstr);
+              shell_linefeed (shell);
+            }
 
           /* additionally show filename candidates */
           if (file_spec (node->cmdstr))

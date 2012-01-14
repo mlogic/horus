@@ -1,6 +1,8 @@
 
 #include <horus.h>
 
+#include <horus_key.h>
+
 char *progname;
 
 void

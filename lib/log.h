@@ -1,4 +1,9 @@
 
+#ifndef _LOG_H_
+#define _LOG_H_
+
+#include <unistd.h>
+
 extern int log_on;
 
 void log_init ();
@@ -12,3 +17,6 @@ void log_dup2 (int fd, int fd2);
 
 void log_mesg (int priority, char *message, ...);
 void log_error (char *message, ...);
+
+#endif /*_LOG_H_*/
+

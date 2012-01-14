@@ -101,7 +101,7 @@ command_complete (char *command_line, int point,
 struct command_node *
 command_match_node (char *command_line, struct command_set *cmdset);
 
-//int file_spec (char *spec);
+int file_spec (char *spec);
 
 #endif /*_COMMAND_H_*/
 

@@ -1,67 +1,54 @@
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <openssl/err.h>
-#include <openssl/pem.h>
-
-#ifndef MIN
-#define MIN(x,y) ((x) < (y) ? (x) : (y))
-#endif /*MIN*/
-
-int
-load_openssl_private_key (char *filename, char *pass)
-{
-  int ret;
-  EVP_PKEY *pkey;
-  FILE *fp;
-
-  if (filename)
-    fprintf (stderr, "filename: %s\n", filename);
-
-  fp = fopen (filename, "r");
-  if (fp == NULL)
-    {
-      fprintf (stderr, "failed to open private key %s\n", filename);
-      return -1;
-    }
-
-  if (pass)
-    fprintf (stderr, "pass: %s\n", pass);
-
-  pkey = PEM_read_PrivateKey (fp, NULL, NULL, pass);
-  if (pkey == NULL)
-    {
-      fprintf (stderr, "failed to read private key %s\n", filename);
-      ERR_print_errors_fp (stderr);
-      return -1;
-    }
-
-  ret = PEM_write_PrivateKey (stdout, pkey, NULL, NULL, 0, 0, NULL);
-  if (ret == 0)
-    {
-      fprintf (stderr, "failed to write private key %s\n", filename);
-      return -1;
-    }
-
-  return 0;
-}
+#include <openssl.h>
+#include <minmax.h>
 
 int
 main (int argc, char **argv)
 {
   int ret;
+  EVP_PKEY *pkey;
+  RSA *rsa;
+  int keysize;
+  unsigned char ibuf[4098], obuf[4098];
+  int isize;
+  FILE *fp;
 
-  if (argc <= 1)
+  if (argc <= 2)
     {
-      printf ("%s <key_filename> [<pass>]\n", argv[0]);
+      printf ("%s <key> <signed> [<pass>]\n", argv[0]);
       exit (1);
     }
 
-  if (argc > 2)
-    ret = load_openssl_private_key (argv[1], argv[2]);
+  if (argc > 3)
+    pkey = openssl_load_private_key (argv[1], argv[3]);
   else
-    ret = load_openssl_private_key (argv[1], NULL);
+    pkey = openssl_load_private_key (argv[1], NULL);
+
+  rsa = EVP_PKEY_get1_RSA (pkey);
+  EVP_PKEY_free (pkey);
+
+  keysize = RSA_size (rsa);
+  printf ("RSA_size: %d\n", keysize);
+
+  isize = MIN (sizeof (ibuf), keysize);
+  printf ("Read size: %d\n", isize);
+
+  printf ("reading: %s\n", argv[2]);
+  fp = fopen (argv[2], "r");
+  fread (ibuf, isize, 1, fp);
+  printf ("Input size: %d\n", isize);
+
+  ret = RSA_public_decrypt (isize, ibuf, obuf, rsa, RSA_PKCS1_PADDING);
+  if (ret < 0)
+    {
+      printf ("decrypt failed\n");
+      ERR_print_errors_fp (stderr);
+      exit (-1);
+    }
+
+  printf ("Decrypted: (%d bytes from %d bytes)\n", ret, isize);
+  fwrite (obuf, ret, 1, stdout);
+  printf ("\nEnd.\n");
 
   exit (ret);
 }

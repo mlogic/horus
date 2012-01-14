@@ -1,6 +1,9 @@
 
 #include <horus.h>
 
+#include <horus_key.h>
+#include <horus_crypt.h>
+
 int debug = 0;
 int is_init = 0;
 

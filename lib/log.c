@@ -1,6 +1,8 @@
 
 #include <horus.h>
 
+#include <log.h>
+
 #define MESG_SIZE 4096
 
 int log_on = 0;

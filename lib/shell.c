@@ -14,12 +14,6 @@ writec (int fd, char c)
   return write (fd, &c, 1);
 }
 
-void
-shell_terminate (struct shell *shell)
-{
-  shell->command_line[shell->end] = '\0';
-}
-
 int
 shell_printf (struct shell *shell, char *format, ...)
 {
@@ -29,8 +23,14 @@ shell_printf (struct shell *shell, char *format, ...)
   ret = vfprintf (shell->terminal, format, ap);
   va_end (ap);
   fflush (shell->terminal);
-  shell_linefeed (shell);
+  //shell_linefeed (shell);
   return ret;
+}
+
+void
+shell_terminate (struct shell *shell)
+{
+  shell->command_line[shell->end] = '\0';
 }
 
 void

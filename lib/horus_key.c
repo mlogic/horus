@@ -1,6 +1,9 @@
 
 #include <horus.h>
 
+#include <log.h>
+#include <horus_key.h>
+
 unsigned int block_size[] = {
   MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 9),
   MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 8),

@@ -53,6 +53,11 @@ struct shell
 #define SHELL_FLAG_EXIT      0x02
 #define SHELL_FLAG_CLOSE     0x04
 #define SHELL_FLAG_DEBUG     0x08
+#define SHELL_FLAG_VTY       0x10
+
+#define VNL "\r\n"
+
+int shell_printf (struct shell *shell, char *format, ...);
 
 void shell_terminate (struct shell *shell);
 void shell_format (struct shell *shell);

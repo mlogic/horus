@@ -4,9 +4,7 @@
 
 #include <command.h>
 
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif /*MIN*/
+#include <minmax.h>
 
 void
 strcommon (char *dest, char *src)

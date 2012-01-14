@@ -1,6 +1,9 @@
 
 #include <horus.h>
 
+#include <horus_key.h>
+#include <horus_crypt.h>
+
 void
 horus_coding_xor (char *buf, int size, char *key, int key_len)
 {

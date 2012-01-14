@@ -1,4 +1,7 @@
 
+#ifndef _HORUS_H_
+#define _HORUS_H_
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif /*HAVE_CONFIG_H*/
@@ -20,7 +23,6 @@
 #include <netinet/in.h>
 
 #include <arpa/inet.h>
-#include <arpa/telnet.h>
 
 #ifdef HAVE_OPENSSL
 #include <openssl/sha.h>
@@ -38,19 +40,11 @@
 #endif
 #endif /*__APPLE__*/
 
-#include "log.h"
-#include "command_shell.h"
-
-#include "horus_key.h"
-#include "horus_crypt.h"
-
 /* Actual branch factor is 2^BRANCH_FACTOR_BITS, i.e., 2^2 = 4. */
 #define BRANCH_FACTOR_BITS     2
 #define MIN_CHUNK_SIZE      4096
 
-#ifndef MIN
-#define MIN(x,y) ((x) < (y) ? (x) : (y))
-#endif /*MIN*/
+#include <minmax.h>
 
 extern int debug;
 
@@ -61,3 +55,4 @@ ssize_t horus_read (int fd, off_t fdpos, void *buf, size_t size);
 ssize_t horus_write (int fd, off_t fdpos, void *buf, size_t size);
 int horus_close (int fd);
 
+#endif /*_HORUS_H_*/

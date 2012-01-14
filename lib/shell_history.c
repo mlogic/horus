@@ -144,6 +144,7 @@ shell_history_show (struct shell *shell)
     {
       char *line = (char *) n->data;
       shell_printf (shell, "  %s", line);
+      shell_linefeed (shell);
     }
 }
 
