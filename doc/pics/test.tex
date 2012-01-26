@@ -1,0 +1,26 @@
+\documentclass{article}
+
+\usepackage{ascmac}
+
+\def\gpicbox#1{%
+\vbox{\unvbox\csname #1\endcsname\kern 0pt}}
+
+\newcommand{\gpicfig}[2]{%
+\input{#1.tex}
+\begin{figure}
+\begin{center}
+\leavevmode
+%\begin{shadebox}
+\gpicbox{#1}
+%\end{shadebox}
+\caption{#2}
+\label{fig:#1}
+\end{center}
+\end{figure}
+}
+
+\begin{document}
+
+\gpicfig{interrupt}{The process flow to interrupt filesystem access.}
+
+\end{document}
