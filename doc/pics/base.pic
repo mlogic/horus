@@ -1,0 +1,40 @@
+.PS
+figname = base;
+
+dx = 0.1; dy = 0.1;
+h = .8; w = .4; m = 0.1;
+
+boxht = h;
+boxwid = w;
+
+down;
+
+SC: [
+right;
+F:  box "Frontend" "Node"; move m; move m;
+C1: box "Client" "Node1"; move m;
+C2: box "Client" "Node2"; move m;
+C3: box "Client" "Node3";
+];
+
+move;
+
+X: [
+right; 
+     box ht .2 invis; move m; move m;
+DFS: box ht .2 wid w*3+m*2;
+]; box dashed wid X.wid+m ht X.ht+m at X
+
+move m;
+
+Y: [
+right;
+KDS: box "KDS"; move m; move m;
+MDS: box "MDS"; move m;
+box "..." wid (w-m)/2 invis; move m;
+MDS: box "OSD"; move m;
+box "..." wid (w-m)/2 invis;
+]; box dashed wid Y.wid+m ht Y.ht+m at Y
+
+.PE
+
