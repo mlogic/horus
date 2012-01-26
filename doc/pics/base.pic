@@ -1,8 +1,8 @@
 .PS
 figname = base;
 
-dx = 0.1; dy = 0.1;
-h = 0.8; w = 0.4; m = 0.1;
+dx = 0.1; dy = 0.1; m = 0.1;
+h = 0.8; w = 0.4;
 xh = 0.5; xw = 0.3;
 
 boxht = h; boxwid = w;
@@ -11,10 +11,12 @@ down;
 
 SC: [
   right;
-  F:  box "Frontend" "Node"; move m; move m;
+  F:  box "Frontend" "Node"; move m;
   C1: box "Client" "Node1"; move m;
   C2: box "Client" "Node2"; move m;
-  C3: box "Client" "Node3";
+  C3: box "Client" "Node3"; move m;
+  C4: box "Client" "Node4"; move m;
+  C5: box "Client" "Node5";
 ]
 
 move;
@@ -48,6 +50,13 @@ X: [
 ]
 
 spline -> down .2 from SC.F.sw+(dx,0) to X.KDS.nw+(dx,dy) to X.KDS.nw+(dx,0)
+# spline -> down .2 from SC.F.sw+(dx*2,0) to X.MDS1.nw+(dx,dy) to X.MDS1.nw+(dx,0)
+
+spline -> down 0.2 from SC.F.sw+(dx*3.5,0) to SC.C1+(0,-0.50) to SC.C1.s
+spline -> down 0.3 from SC.F.sw+(dx*3.0,0) to SC.C2+(0,-0.75) to SC.C2.s
+spline -> down 0.4 from SC.F.sw+(dx*2.5,0) to SC.C3+(0,-1.00) to SC.C3.s
+spline -> down 0.5 from SC.F.sw+(dx*2.0,0) to SC.C4+(0,-1.25) to SC.C4.s
+spline -> down 0.6 from SC.F.sw+(dx*1.5,0) to SC.C5+(0,-1.50) to SC.C5.s
 
 .PE
 

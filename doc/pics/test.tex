@@ -23,6 +23,20 @@
 
 \gpicfig{interrupt}{The process flow to interrupt the filesystem access.}
 
-\gpicfig{base}{Key registration.}
+\gpicfig{base}{Sample.}
+
+\gpicfig{keyreg}{Key registration and configuration for application $A$.
+$A$ registers its private key $KR_A$ to $KDS$, and key hash configuration
+$(bs,d,E_{KU_A}(K_R))$ and allowed range $(i_k,j_k)$ for each $C_k$,
+as the extended attributes of the file in the distributed file system.
+$A$ can use any of client nodes to do so.}
+
+\gpicfig{keyexchange}{Key exchange. The client node 2 ($C_2$) \texttt{open()}s
+a file, where the process is interrupted by Horus library, and then
+redirected to a $KDS$.
+$KDS$ extracts the encrypted key and the configurations from extended
+attributes in the file system, and calculates the range key $K_{i_2,j_2}$
+for $C_2$. The key is returned to the client node for subsequent
+file access.}
 
 \end{document}
