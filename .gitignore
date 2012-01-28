@@ -24,4 +24,6 @@ stamp-h1
 compile
 libtool
 
+tmp
+
 horus-*.tar.gz
