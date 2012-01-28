@@ -27,16 +27,17 @@ $(bs,d,E_{KU_A}(K_R))$ and allowed range $(i_k,j_k)$ for each $C_k$,
 as the extended attributes of the file in the distributed file system.
 $A$ can use any of client nodes to do so.}
 
-\gpicfig{keyexchange}{Key exchange. The client node 2 ($C_2$) \texttt{open()}s
-a file, where the process is interrupted by Horus library, and then
-redirected to a $KDS$.
+\gpicfig{keyexchange}{Key exchange. When the client node 2 ($C_2$) issues
+\texttt{open()} system call, the process is interrupted by Horus library,
+and then corresponding key is requested to a $KDS$ (1).
 $KDS$ extracts the encrypted key and the configurations from extended
-attributes in the file system, and calculates the range key $K_{i_2,j_2}$
-for $C_2$. The key is returned to the client node for subsequent
-file access.}
+attributes in the file system (2)(3), and calculates the range key
+$K_{i_2,j_2}$ for $C_2$. The key is returned to the client node for
+subsequent file access (4).}
 
 \gpicfig{interrupt}{The process flow to interrupt the filesystem access.}
 
 \gpicfig{base}{Sample.}
 
 \end{document}
+
