@@ -93,7 +93,7 @@ Computing node $C_2$ accesses the file data through the intervention
 by $\kds$.
 
 \begin{eqnarray}
-C_2 \rightarrow \kds & : & \mbox{open request: } \{ path \} \\
+C_2 \rightarrow \kds & : & \mbox{key request: } \{ path \} \\
 \kds \rightarrow \mds & : & \mbox{attr request: } \{ path,C_2 \} \\
 \mds \rightarrow \kds & : & \mbox{attr response: } \{ path,bs,d,E_{KU_A}(K_R),C_2,i_2,j_2 \} \\
 \kds         & : & K_{i_2,j_2} \leftarrow E_{KU_A}(K_R) \times KR_A \\
