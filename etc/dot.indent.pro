@@ -1,0 +1,4 @@
+--gnu-style
+--no-tabs
+--blank-lines-after-declarations
+--line-length 80
