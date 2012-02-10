@@ -4,6 +4,10 @@
 
 #include <unistd.h>
 
+#ifdef __linux__
+#include <sys/types.h>
+#endif
+
 extern int log_on;
 
 void log_init ();
