@@ -20,9 +20,9 @@
 /* horus_ea_config_entry specifies range allowed for a client with IP addr. */
 struct horus_ea_config_entry
 {
-	unsigned char addr[4];   /* Client IP address */
-	unsigned char start_block_num[4];  /* Start block number */
-	unsigned char end_block_num[4];    /* End block number */
+  unsigned char addr[4];        /* Client IP address */
+  unsigned char start_block_num[4];     /* Start block number */
+  unsigned char end_block_num[4];       /* End block number */
 };
 
 /* horus_ea_config is the actual extended attribute which stores all the configuration
@@ -30,22 +30,60 @@ struct horus_ea_config_entry
 
 struct horus_ea_config
 {
-	unsigned char reserved[4];      /* Maybe store magic number or some other bits */
-	unsigned char entry_count[4];
-	unsigned char master_key[HORUS_MASTERKEY_LEN];
-	struct horus_ea_config_entry entry_table[100]; /* 100 * 12 = 1200 bytes. Should be sufficient for testing */ 
+  unsigned char reserved[4];    /* Maybe store magic number or some other bits */
+  unsigned char entry_count[4];
+  unsigned char master_key[HORUS_MASTERKEY_LEN];
+  struct horus_ea_config_entry entry_table[100];        /* 100 * 12 = 1200 bytes. Should be sufficient for testing */
 };
 
+/*
+ * horus_set_fattr_masterkey
+ * In: 
+ * fd - File Descriptor of file
+ * key - Masterkey to be set
+ * Out:
+ * return code
+*/
 
-int
-horus_set_fattr_masterkey (int fd, char *key);
-int
-horus_get_fattr_masterkey (int fd, char *buf, int bufsiz);
+int horus_set_fattr_masterkey (int fd, char *key);
+
+/*
+ * horus_get_fattr_masterkey
+ * In:
+ * fd     - File Descriptor of file
+ * bufsiz - size of buffer
+ * 
+ * Out:
+ * buf - Masterkey
+ * return code
+*/
+int horus_get_fattr_masterkey (int fd, char *buf, int bufsiz);
+
+/*
+ * horus_set_fattr_client
+ * In:
+ * fd     - File Descriptor of file
+ * client - IP address of client
+ * start  - Start block number
+ * end    - End block number
+ * Out:
+ * return code
+*/
 
 int
 horus_set_fattr_client (int fd, struct in_addr *client,
                         u_int32_t start, u_int32_t end);
+
+/*
+ * horus_get_fattr_client
+ * In:
+ * fd      - File Descriptor of File
+ * client  - IP address of client
+ * Out
+ * start   - Start block number
+ * end     - End block number
+*/
+
 int
 horus_get_fattr_client (int fd, struct in_addr *client,
-                        u_int32_t *start, u_int32_t *end);
-	
+                        u_int32_t * start, u_int32_t * end);

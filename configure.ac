@@ -53,5 +53,5 @@ AX_PTHREAD([AC_DEFINE([HAVE_PTHREAD],1,[POSIX thread support.])])
 LT_INIT
 AC_SUBST([LIBTOOL_DEPS])
 
-AC_CONFIG_FILES([Makefile lib/Makefile src/Makefile etc/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile src/Makefile etc/Makefile horusfs/Makefile])
 AC_OUTPUT
