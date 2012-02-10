@@ -22,13 +22,13 @@ horus_ea_config_masterkey (char *path, int in_fd, char *key)
       return -1;
     }
 
-  if (in_fd == -1)
+  if (in_fd == -1 && path != NULL)
     {
       fd = open (path, O_RDWR);
       if (fd == -1)
         return -errno;
     }
-  else if (path == NULL)
+  else if (in_fd == -1 && path == NULL)
     {
       fprintf (stderr, "path and fd both not specified!\n");
       return -1;
@@ -41,7 +41,6 @@ horus_ea_config_masterkey (char *path, int in_fd, char *key)
     fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
   if (res == -1)
     {
-      printf ("err %s", strerror (errno));
       horus_ea_config_init (&config);
     }
 
@@ -184,7 +183,7 @@ int
 horus_set_fattr_client (int fd, struct in_addr *client,
                         u_int32_t start, u_int32_t end)
 {
-  horus_ea_config_add_entry (NULL, fd, *client, start, end);
+  return horus_ea_config_add_entry (NULL, fd, *client, start, end);
 }
 
 
