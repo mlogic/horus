@@ -10,6 +10,9 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_PREFIX_DEFAULT($HOME)
 
 CFLAGS="$CFLAGS -g -O0 -Wall"
+# must explicitly reference lpthread when compiling on Fedora
+# see https://fedoraproject.org/wiki/UnderstandingDSOLinkChange
+PTHREAD_LIBS="-lpthread"
 
 AC_ARG_ENABLE([horus],
   [AS_HELP_STRING([--enable-horus],
@@ -45,9 +48,9 @@ AC_CHECK_HEADERS([stdlib.h string.h])
 AC_C_CONST
 
 # Checks for library functions.
-AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL],1,[OpenSSL support.])])
+AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL],1,[OpenSSL support.])],AC_MSG_ERROR([Missing OpenSSL]))
 
-AX_PTHREAD([AC_DEFINE([HAVE_PTHREAD],1,[POSIX thread support.])])
+AX_PTHREAD([AC_DEFINE([HAVE_PTHREAD],1,[POSIX thread support.])],AC_MSG_ERROR([Missing pthread]))
 
 # Libtool
 LT_INIT

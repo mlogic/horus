@@ -3,6 +3,7 @@
 
 #include <log.h>
 #include <horus_key.h>
+#include <openssl/sha.h>
 
 unsigned int block_size[] = {
   MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 9),

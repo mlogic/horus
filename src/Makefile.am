@@ -1,6 +1,6 @@
 
 AM_CPPFLAGS = -I$(top_srcdir)/lib @OPENSSL_INCLUDES@
-AM_LDFLAGS = -L$(top_srcdir)/lib @OPENSSL_LDFLAGS@
+AM_LDFLAGS = -L$(top_srcdir)/lib @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@
 
 noinst_PROGRAMS = test-shell test-command-shell test-pthread test-openssl
 test_shell_SOURCES = test_shell.c

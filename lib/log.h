@@ -3,6 +3,7 @@
 #define _LOG_H_
 
 #include <unistd.h>
+#include <sys/types.h>
 
 #ifdef __linux__
 #include <sys/types.h>
