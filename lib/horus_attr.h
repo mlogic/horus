@@ -1,3 +1,6 @@
+#ifndef _HORUS_ATTR_H_
+#define _HORUS_ATTR_H_
+
 #include <stdio.h>
 #include <string.h>
 #include <netinet/in.h>
@@ -87,3 +90,14 @@ horus_set_fattr_client (int fd, struct in_addr *client,
 int
 horus_get_fattr_client (int fd, struct in_addr *client,
                         u_int32_t * start, u_int32_t * end);
+int
+horus_ea_config_show (char *path);
+
+int
+horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
+                                   uint32_t start_block, uint32_t end_block);
+
+int
+horus_ea_config_masterkey (char *path, int in_fd, char *key);
+
+#endif
