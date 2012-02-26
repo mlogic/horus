@@ -55,7 +55,7 @@ main (int argc, char **argv)
   shell = shell_create ();
   shell_history_enable (shell);
   shell_set_terminal (shell, 0, 1);
-  shell_install (shell, CONTROL('J'), shell_history_keyfunc_ctrl_j);
+  shell_install (shell, CONTROL ('J'), shell_history_keyfunc_ctrl_j);
 
   shell_start (shell);
 
@@ -69,5 +69,3 @@ main (int argc, char **argv)
 
   return 0;
 }
-
-

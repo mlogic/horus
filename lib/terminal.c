@@ -23,6 +23,7 @@ terminal_service (void *arg)
   char dont_linemode[] = { IAC, DONT, TELOPT_LINEMODE, '\0' };
 
   shell = command_shell_create ();
+  shell->shell->saddr = thread->saddr; 
   shell_install (shell->shell, CONTROL('C'), NULL);
   shell_history_enable (shell->shell);
   INSTALL_COMMAND (shell->cmdset, show_history);
@@ -86,6 +87,7 @@ terminal_accept (void *arg)
       t->readfd = fd;
       t->writefd = fd;
       t->arg = NULL;
+      t->saddr = saddr;
 
       fprintf (stderr, "thread[%d]: terminal service for %s:%d on fd %d.\n",
                t->index, saddr_name, saddr.sin_port, fd);

@@ -9,7 +9,7 @@ AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_PREFIX_DEFAULT($HOME)
 
-CFLAGS="$CFLAGS -g -O0 -Wall"
+CFLAGS="$CFLAGS -g -O0 -Wall -D_FILE_OFFSET_BITS=64"
 # must explicitly reference lpthread when compiling on Fedora
 # see https://fedoraproject.org/wiki/UnderstandingDSOLinkChange
 PTHREAD_LIBS="-lpthread"
@@ -51,6 +51,7 @@ AC_C_CONST
 AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL],1,[OpenSSL support.])],AC_MSG_ERROR([Missing OpenSSL]))
 
 AX_PTHREAD([AC_DEFINE([HAVE_PTHREAD],1,[POSIX thread support.])],AC_MSG_ERROR([Missing pthread]))
+
 
 # Libtool
 LT_INIT

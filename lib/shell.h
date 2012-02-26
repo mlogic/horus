@@ -13,6 +13,9 @@
 #include <ctype.h>
 #include <errno.h>
 #include <assert.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 
 #define SHELL_WORD_DELIMITERS " "
 #define SHELL_WORD_DELIMITERS_SUB " /"
@@ -33,6 +36,7 @@ struct shell
   int flag;
   int readfd;
   int writefd;
+  struct sockaddr_in saddr;
   FILE *terminal;
   int interactive;
 

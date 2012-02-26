@@ -40,7 +40,7 @@ main (int argc, char **argv)
   shell = command_shell_create ();
   shell_history_enable (shell->shell);
   shell_set_terminal (shell->shell, 0, 1);
-  shell_install (shell->shell, CONTROL('C'), NULL);
+  shell_install (shell->shell, CONTROL ('C'), NULL);
 
   command_shell_start (shell);
 
@@ -53,5 +53,3 @@ main (int argc, char **argv)
 
   return 0;
 }
-
-

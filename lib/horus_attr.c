@@ -44,7 +44,7 @@ horus_ea_config_masterkey (char *path, int in_fd, char *key)
       horus_ea_config_init (&config);
     }
 
-  strncpy (config.master_key, key, HORUS_MASTERKEY_LEN);
+  strncpy (config.master_key, key, strlen(key));
 
 set_attr:
   res =

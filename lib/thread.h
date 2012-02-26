@@ -8,6 +8,8 @@
 #include <assert.h>
 
 #include <pthread.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 struct thread {
   struct thread_master *master;
@@ -18,6 +20,7 @@ struct thread {
   char *name;
   int readfd;
   int writefd;
+  struct sockaddr_in saddr;
   void *arg;
   void *ret;
 };

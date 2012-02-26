@@ -19,11 +19,12 @@ pthread_mutex_t cond_mutex[COND_MAX];
 pthread_cond_t cond[COND_MAX];
 
 #define THREAD_MAX 256
-struct thread_arg {
+struct thread_arg
+{
   pthread_t pthread;
   int index;
   void *ret;
-  void * (*func) (void *arg);
+  void *(*func) (void *arg);
 };
 struct thread_arg arg[THREAD_MAX];
 
@@ -31,6 +32,7 @@ void *
 test_func (void *thread_arg)
 {
   struct thread_arg *arg = (struct thread_arg *) thread_arg;
+
   printf ("thread[%d]: 1. started.\n", arg->index);
 
   printf ("thread[%d]: 2. wait START condition.\n", arg->index);
@@ -94,6 +96,3 @@ main (int argc, char **argv)
 
   return 0;
 }
-
-
-

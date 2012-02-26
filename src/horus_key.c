@@ -15,7 +15,7 @@ usage ()
 int
 main (int argc, char **argv)
 {
-  int i;
+  int i, arg_shift = 0;
   int x, y;
   int offset = 4096;
   char *master = "master";
@@ -29,23 +29,29 @@ main (int argc, char **argv)
   /* Help */
   if (argc > 1)
     {
-      if (! strcmp (argv[1], "-h"))
+      if (!strcmp (argv[1], "-h"))
         usage ();
-      if (! strcmp (argv[1], "--help"))
+      if (!strcmp (argv[1], "--help"))
         usage ();
-      if (! strcmp (argv[1], "-d"))
-        debug++;
-      if (! strcmp (argv[1], "--debug"))
-        debug++;
+      if (!strcmp (argv[1], "-d"))
+        {
+          debug++;
+          arg_shift++;
+        }
+      if (!strcmp (argv[1], "--debug"))
+        {
+          debug++;
+          arg_shift++;
+        }
     }
 
   /* Byte offset */
-  if (argc > 1)
-    offset = atoi (argv[1]);
+  if (argc > arg_shift + 1)
+    offset = atoi (argv[arg_shift + 1]);
 
   /* Master key */
-  if (argc > 2)
-    master = argv[2];
+  if (argc > arg_shift + 2)
+    master = argv[arg_shift + 2];
   snprintf (parent, sizeof (parent), "%s", master);
   parent_len = strlen (master);
 
@@ -72,10 +78,7 @@ main (int argc, char **argv)
 
   printf ("K_(%d,%d) = %s(%d) [%010d-%010d]\n",
           x, y, print_key (key, key_len), key_len,
-          block_size[x] * y, block_size[x] * (y + 1) -1);
+          block_size[x] * y, block_size[x] * (y + 1) - 1);
 
   return 0;
 }
-
-
-

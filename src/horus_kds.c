@@ -11,14 +11,16 @@
 #include <terminal.h>
 #include <openssl.h>
 
+#include <horus_attr.h>
+#include <horus_key.h>
+
 #define HORUS_KEY_SERVER_PORT 6666
 #define HORUS_KDS_TERMINAL_PORT 6667
 
 #ifndef MAXPATHLEN
 #define MAXPATHLEN 1024
 #endif /*MAXPATHLEN*/
-
-struct horus_key_range
+  struct horus_key_range
 {
   u_int32_t i;
   u_int32_t j;
@@ -97,17 +99,15 @@ struct thread_master *master = NULL;
 struct vectorx *kdb = NULL;
 
 DEFINE_COMMAND (show_thread,
-                "show thread",
-                "show\n"
-                "show thread information.\n")
+                "show thread", "show\n" "show thread information.\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
   int i;
 
   shell_printf (csh->shell,
-    "state: NONE:%d, RELEASED: %d, RUNNING:%d, ENDING:%d",
-    THREAD_STATE_NONE, THREAD_STATE_RELEASED,
-    THREAD_STATE_RUNNING, THREAD_STATE_ENDING);
+                "state: NONE:%d, RELEASED: %d, RUNNING:%d, ENDING:%d",
+                THREAD_STATE_NONE, THREAD_STATE_RELEASED,
+                THREAD_STATE_RUNNING, THREAD_STATE_ENDING);
   shell_linefeed (csh->shell);
   for (i = 0; i < master->nthreads; i++)
     {
@@ -122,13 +122,12 @@ DEFINE_COMMAND (show_thread,
 }
 
 DEFINE_COMMAND (show_user_key,
-                "show user-key",
-                "show\n"
-                "show user's key information.\n")
+                "show user-key", "show\n" "show user's key information.\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
   struct vectorx_node *n;
   struct kdb_entry *entry;
+
   //int ret;
 
   for (n = vectorx_head (kdb); n; n = vectorx_next (n))
@@ -140,11 +139,11 @@ DEFINE_COMMAND (show_user_key,
 
 #if 0
       ret = PEM_write_PrivateKey (csh->shell->terminal,
-        entry->private_key, NULL, NULL, 0, 0, NULL);
+                                  entry->private_key, NULL, NULL, 0, 0, NULL);
       if (ret == 0)
         shell_printf (csh->shell, "failed to display private key.");
       shell_linefeed (csh->shell);
-#endif /*0*/
+#endif /*0 */
     }
 }
 
@@ -195,8 +194,7 @@ DEFINE_COMMAND (user_key,
                 "user's key information.\n"
                 "specify username\n"
                 "specify username\n"
-                "specify private-key\n"
-                "specify file path\n")
+                "specify private-key\n" "specify file path\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
   struct kdb_entry *request, *exist;
@@ -251,8 +249,7 @@ DEFINE_COMMAND (no_user_key,
                 "no user-key user USERNAME",
                 "negate\n"
                 "delete user's key information.\n"
-                "specify username\n"
-                "specify username\n")
+                "specify username\n" "specify username\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
   struct kdb_entry *request, *exist;
@@ -270,6 +267,73 @@ DEFINE_COMMAND (no_user_key,
   kdb_delete (request);
 }
 
+DEFINE_COMMAND (get_range_key,
+                "get-range-key FILEPATH", "Get range key for a file\n")
+{
+  struct command_shell *csh = (struct command_shell *) context;
+  int fd = -1, i;
+  uint32_t start_block, end_block, x, y, range_size;
+  int ret, key_len, parent_len;
+  char key[SHA_DIGEST_LENGTH], range[30], parent[30];
+  char *master = "nakul";
+
+  fd = open (argv[1], O_RDONLY);
+  if (fd < 0)
+    {
+      shell_printf (csh->shell, "Unable to open %d!", argv[1]);
+    }
+  else
+    {
+      ret = horus_get_fattr_client (fd, &(csh->shell->saddr.sin_addr),
+                                    &start_block, &end_block);
+      if (ret == 0)
+        {
+
+          sprintf (range, "%u,%u", start_block, end_block);
+          /* MIN_CHUCK_SIZE equals block size ?? */
+
+          range_size = (end_block - start_block) * MIN_CHUNK_SIZE;
+
+          if (range_size > block_size[0])
+            {
+              shell_printf (csh->shell, "Error: Range too big");
+              shell_linefeed (csh->shell);
+              goto exit;
+            }
+          for (i = 9; i >= 0; i--)
+            {
+              if (range_size <= block_size[i])
+                {
+                  x = i;
+                  break;
+                }
+            }
+          y = (start_block * MIN_CHUNK_SIZE) / block_size[x];
+          snprintf (parent, sizeof (parent), "%s", master);
+          parent_len = strlen (master);
+          debug++;
+          ret = horus_key_by_master (key, &key_len, x, y, parent, parent_len);
+          debug--;
+          if (ret == 0)
+            shell_printf (csh->shell, "range_key k[%u,%u] = %s", x, y,
+                          print_key (key, key_len));
+          else
+            shell_printf (csh->shell, "Error: horus_key_by_master error %d",
+                          ret);
+          shell_linefeed (csh->shell);
+        }
+      else
+        {
+          shell_printf (csh->shell, "Range key not found!");
+          shell_linefeed (csh->shell);
+        }
+    }
+
+exit:
+  if (fd > 0)
+    close (fd);
+}
+
 void
 horus_kds_install_commands (struct command_set *cmdset)
 {
@@ -277,6 +341,7 @@ horus_kds_install_commands (struct command_set *cmdset)
   INSTALL_COMMAND (cmdset, show_user_key);
   INSTALL_COMMAND (cmdset, user_key);
   INSTALL_COMMAND (cmdset, no_user_key);
+  INSTALL_COMMAND (cmdset, get_range_key);
 }
 
 int
@@ -304,5 +369,3 @@ main (int argc, char **argv)
 
   return 0;
 }
-
-
