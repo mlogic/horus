@@ -20,7 +20,7 @@ START_TEST (test_horus_set_get_key)
   const char key_2_0[] = "key_2_0";
   const char key_3_3[] = "key_3_3";
   void *key_buf;
-  const int kht_branching_factor[2] = {2,2};
+  const int kht_branching_factor[2] = { 2, 2 };
 
   // Set a KHT with 3 levels
   #define KHT_DEPTH 3

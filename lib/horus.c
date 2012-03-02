@@ -73,6 +73,7 @@ _key_store_entry *find_key_by_fd_or_create_new (const int fd)
 	abort ();
       memset (p, 0, sizeof (struct _key_store_entry));
       p->fd = fd;
+      p->cipher = aes_xts_init();
       // first entry of key_store?
       if (NULL == key_store)
 	{
@@ -109,60 +110,123 @@ horus_pwrite (int fd, void *buf, size_t size, off_t fdpos)
 ssize_t
 horus_read (int fd, void *buf, size_t nbyte)
 {
-  char *ktype, *kvalue;
-  struct stat statbuf;
-  size_t fdpos;
-  struct _key_store_entry *ent;
+  void *encrypted_buf = NULL;
+  void *horus_block_key = NULL;
+  u8 iv[HORUS_KEY_LEN];
+  size_t nbyte_remain = nbyte;
+  size_t block_size;
+  size_t block_id;
 
-  fstat (fd, &statbuf);
- 
-  if (S_ISREG (statbuf.st_mode))
-    fdpos = lseek (fd, 0, SEEK_CUR);
-  else
+  struct _key_store_entry *key_info = find_key_by_fd (fd);
+  if (NULL == key_info)
     {
-      log_error ("Using horus_read on non-regular file, aborting...");
+      log_error ("file hasn't been properly inited by horus");
+      abort ();
+    }
+  block_size = key_info->leaf_block_size;
+
+  size_t fdpos = lseek (fd, 0, SEEK_CUR);
+  if ( (fdpos % block_size != 0) ||
+       (nbyte % block_size != 0) )
+    {
+      log_error ("Read on non-aligned block is not supported yet");
       abort ();
     }
 
-
-  if (fdpos % HORUS_BLOCK_SIZE != 0)
+  encrypted_buf = malloc (block_size);
+  if (NULL == encrypted_buf)
     {
-      log_error ("Write on non-aligned block is not supported yet");
+      perror (__func__);
       abort ();
     }
+  while (nbyte_remain > 0)
+    {
+      block_id = fdpos / block_size;
+      horus_get_leaf_block_key (fd, &horus_block_key, block_id);
+      aes_xts_setkey (key_info->cipher, horus_block_key, HORUS_KEY_LEN);
+      // Use block_id as IV
+      memset (iv, 0, sizeof (iv));
+      *(size_t *)iv = block_id;
 
-  ent = find_key_by_fd (fd);
+      if ( block_size !=
+	   read (fd, encrypted_buf, block_size) )
+	{
+	  perror (__func__);
+	  abort ();
+	}
+      aes_xts_decrypt (key_info->cipher,
+		       buf + (nbyte - nbyte_remain),
+		       encrypted_buf,
+		       block_size,
+		       iv);
+      fdpos += block_size;
+      nbyte_remain -= block_size;
+    }
 
-  abort ();
-
-  /* horus_get_key (&ktype, &kvalue); */
-  /* if (ktype && kvalue) */
-  /*   horus_decrypt (fd, fdpos, buf, nbyte, ktype, kvalue); */
-
-  return 0;
+  if (encrypted_buf)
+    free (encrypted_buf);
+  return nbyte;
 }
 
 ssize_t
 horus_write (int fd, void *buf, size_t nbyte)
 {
-  char *ktype, *kvalue;
-  struct _key_store_entry *ent;
-  void *encrypted_buf;
-  size_t fdpos = lseek (fd, 0, SEEK_CUR);
+  void *encrypted_buf = NULL;
+  void *horus_block_key = NULL;
+  u8 iv[HORUS_KEY_LEN];
+  size_t nbyte_remain = nbyte;
+  size_t block_size;
+  size_t block_id;
 
-  if (fdpos % HORUS_BLOCK_SIZE != 0)
+  struct _key_store_entry *key_info = find_key_by_fd (fd);
+  if (NULL == key_info)
+    {
+      log_error ("file hasn't been properly inited by horus");
+      abort ();
+    }
+  block_size = key_info->leaf_block_size;
+
+  size_t fdpos = lseek (fd, 0, SEEK_CUR);
+  if ( (fdpos % block_size != 0) ||
+       (nbyte % block_size != 0) )
     {
       log_error ("Write on non-aligned block is not supported yet");
       abort ();
     }
 
-  ent = find_key_by_fd (fd);
+  encrypted_buf = malloc (block_size);
+  if (NULL == encrypted_buf)
+    {
+      perror (__func__);
+      abort ();
+    }
+  while (nbyte_remain > 0)
+    {
+      block_id = fdpos / block_size;
+      horus_get_leaf_block_key (fd, &horus_block_key, block_id);
+      aes_xts_setkey (key_info->cipher, horus_block_key, HORUS_KEY_LEN);
+      // Use block_id as IV
+      memset (iv, 0, sizeof (iv));
+      *(size_t *)iv = block_id;
 
-  abort ();
+      aes_xts_encrypt (key_info->cipher,
+		       encrypted_buf,
+		       buf + (nbyte - nbyte_remain),
+		       block_size,
+		       iv);
+      if ( block_size !=
+	   write (fd, encrypted_buf, block_size) )
+	{
+	  perror (__func__);
+	  abort ();
+	}
+      fdpos += block_size;
+      nbyte_remain -= block_size;
+    }
 
-  //horus_encrypt (ent, fdpos, buf, size, ktype, kvalue);
-
-  return 0;
+  if (encrypted_buf)
+    free (encrypted_buf);
+  return nbyte;
 }
 
 int

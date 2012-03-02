@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include "vectorx.h"
+#include "xts.h"
 
 // TODO: use a tree to store KHT
 struct _key_store_entry
@@ -26,6 +27,9 @@ struct _key_store_entry
   size_t leaf_block_size;
   struct vectorx **key_vec;
   int *branching_factor;
+  
+  struct aes_xts_cipher *cipher;
+
   struct _key_store_entry *next;
 };
 
