@@ -268,67 +268,79 @@ DEFINE_COMMAND (no_user_key,
 }
 
 DEFINE_COMMAND (get_range_key,
-                "get-range-key FILEPATH", "Get range key for a file\n")
+                "get-range-key FILEPATH X Y", "Get range key for a file\n")
 {
   struct command_shell *csh = (struct command_shell *) context;
   int fd = -1, i;
-  uint32_t start_block, end_block, x, y, range_size;
+  uint32_t start_block, end_block, x, y, range_size, blk, start,end;
   int ret, key_len, parent_len;
   char key[SHA_DIGEST_LENGTH], range[30], parent[30];
-  char *master = "nakul";
+  char master[30];
+  char *filename;
+  fprintf(stderr, "test this %s %s %s!!!\n", argv[1], argv[2],argv[3]);
+  if (argc < 3 )
+  {
+    shell_printf (csh->shell, "Too few arguments!");
+    shell_linefeed (csh->shell);
+    goto exit;
+  }
 
-  fd = open (argv[1], O_RDONLY);
+  filename = argv[1];
+  x = atoi(argv[2]);
+  y = atoi(argv[3]);
+
+  fd = open (filename, O_RDONLY);
   if (fd < 0)
-    {
-      shell_printf (csh->shell, "Unable to open %d!", argv[1]);
-    }
+  {
+      shell_printf (csh->shell, "Unable to open %s!", argv[1]);
+      shell_linefeed (csh->shell);
+      goto exit;
+  }
   else
+  {
+    ret = horus_get_fattr_client (fd, &(csh->shell->saddr.sin_addr),
+                                  &start_block, &end_block);
+    if (ret != 0)
     {
-      ret = horus_get_fattr_client (fd, &(csh->shell->saddr.sin_addr),
-                                    &start_block, &end_block);
-      if (ret == 0)
-        {
+      shell_printf(csh->shell, "Range for %s not configured for client",
+                   filename);
+      shell_linefeed(csh->shell);
+      goto exit;
+    }
 
-          sprintf (range, "%u,%u", start_block, end_block);
-          /* MIN_CHUCK_SIZE equals block size ?? */
 
-          range_size = (end_block - start_block) * MIN_CHUNK_SIZE;
+    ret = horus_get_fattr_masterkey (fd, master, 30);
+    if (ret < 0)
+    {
+      shell_printf(csh->shell, "Unable to read master-key ret = %d!",ret);
+      shell_linefeed(csh->shell);
+      goto exit;
+    }
+    master[ret+1] = '\0';  /* ret actually has length of master-key */
 
-          if (range_size > block_size[0])
-            {
-              shell_printf (csh->shell, "Error: Range too big");
-              shell_linefeed (csh->shell);
-              goto exit;
-            }
-          for (i = 9; i >= 0; i--)
-            {
-              if (range_size <= block_size[i])
-                {
-                  x = i;
-                  break;
-                }
-            }
-          y = (start_block * MIN_CHUNK_SIZE) / block_size[x];
+
+    /* Convert x,y into start-block  and end-block  number */
+    start = (y * block_size[x]/MIN_CHUNK_SIZE);
+    end = ((y+1) * block_size[x]/MIN_CHUNK_SIZE);
+
+    if ((start >=start_block) && (end<=end_block))
+    {
           snprintf (parent, sizeof (parent), "%s", master);
           parent_len = strlen (master);
-          debug++;
           ret = horus_key_by_master (key, &key_len, x, y, parent, parent_len);
-          debug--;
           if (ret == 0)
-            shell_printf (csh->shell, "range_key k[%u,%u] = %s", x, y,
-                          print_key (key, key_len));
+            shell_printf (csh->shell, "%s", print_key (key, key_len));
           else
             shell_printf (csh->shell, "Error: horus_key_by_master error %d",
                           ret);
           shell_linefeed (csh->shell);
-        }
-      else
-        {
-          shell_printf (csh->shell, "Range key not found!");
-          shell_linefeed (csh->shell);
-        }
     }
-
+    else
+    {
+       shell_printf(csh->shell, "Access denied!");
+       shell_linefeed(csh->shell);
+    }
+  }
 exit:
   if (fd > 0)
     close (fd);
