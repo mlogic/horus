@@ -1,3 +1,15 @@
+/*
+ * Horus Key Utils
+ *
+ * Copyright (c) 2012, University of California, Santa Cruz, CA, USA.
+ * Developers:
+ *  Yasuhiro Ohara <yasu@soe.ucsc.edu>
+ *  Yan Li <yanli@ucsc.edu>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as 
+ * published by the Free Software Foundation.
+ */
 
 #include <horus.h>
 
@@ -17,6 +29,8 @@ unsigned int block_size[] = {
   MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 1),
   MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 0),
 };
+
+struct _key_store_entry *key_store = NULL, *key_store_tail = NULL;
 
 void
 key_to_value (char *key, int *key_len, char *string)
@@ -99,7 +113,7 @@ print_key (char *key, int key_len)
 }
 
 char *
-block_key (char *key, int *key_len,
+block_key (char *key, size_t *key_len,
            char *parent, int parent_len, int x, int y)
 {
   void *message;
@@ -130,7 +144,7 @@ block_key (char *key, int *key_len,
 #else /*__APPLE__*/
   HMAC (EVP_sha1(), parent, parent_len,
         (const unsigned char *) message, size,
-        key, key_len);
+        (unsigned char *) key, key_len);
 #endif /*__APPLE__*/
 
   if (debug)
@@ -222,7 +236,7 @@ horus_key_by_master (char *key, int *key_len, int x, int y,
 }
 
 void
-horus_key (char *key, int *key_len, int filepos,
+horus_key (char *key, size_t *key_len, int filepos,
            char *ktype, char *kvalue)
 {
   int x, y;
@@ -230,6 +244,11 @@ horus_key (char *key, int *key_len, int filepos,
   char keybuf[SHA_DIGEST_LENGTH * 2 + 1];
 
   x = 9;
+  if (0 != filepos % MIN_CHUNK_SIZE)
+    {
+      log_error ("Non-block-aligned access is not supported yet.");
+      abort ();
+    }
   y = filepos / MIN_CHUNK_SIZE;
 
   if (! ktype || ! kvalue)
@@ -259,10 +278,82 @@ horus_key (char *key, int *key_len, int filepos,
 }
 
 void
-horus_get_key (char **ktype, char **kvalue)
+horus_get_key_from_env (char **ktype, char **kvalue)
 {
   *ktype = getenv ("HORUS_KEY_TYPE");
   *kvalue = getenv ("HORUS_KEY_VALUE");
 }
 
 
+/** Scan key_store and look for entry of fd
+ */
+struct _key_store_entry*
+find_key_by_fd (const int fd)
+{
+  struct _key_store_entry *p = key_store;
+  while (p != NULL)
+    {
+      if (fd == p->fd)
+	return p;
+    }
+
+  // not found
+  return NULL;
+}
+
+int
+horus_get_key (const int fd, void **out_key, const int x, const int y)
+{
+  struct vectorx *key_vec_x;
+  void *parent_key;
+  struct _key_store_entry *p = find_key_by_fd (fd);
+
+  if (NULL == p)
+    {
+      perror (__func__);
+      abort ();
+    }
+
+  if (x > p->depth)
+    {
+      perror ("Trying to get a key at a level deeper than the depth of KHT.");
+      abort ();
+    }
+  if (x == 0)
+    {
+      if (y != 0)
+	{
+	  perror ("y != 0 at level 0");
+	}
+      *out_key = p->master_key;
+      return *out_key == NULL ? -1 : 0;
+    }
+
+  key_vec_x = p->key_vec[x-1];
+  
+  if ((*out_key = vectorx_get (key_vec_x, y)) == NULL)
+    {
+      int key_len;
+      int parent_branching_factor = p->branching_factor[x-2];
+      // get parent key and compute K(x,y)
+      horus_get_key (fd, &parent_key, x - 1, y / parent_branching_factor);
+      if (NULL == parent_key)
+	{
+	  *out_key = NULL;
+	  return -1;
+	}
+
+      *out_key = malloc (EVP_MAX_MD_SIZE);
+      if (*out_key == NULL)
+	{
+	  perror (__func__);
+	  abort ();
+	}
+      
+      block_key (*out_key, &key_len, parent_key, HORUS_KEY_LEN, x, y);
+      vectorx_set (key_vec_x, y, *out_key);
+      return 0;
+    }
+  
+  return 0;
+}

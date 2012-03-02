@@ -63,7 +63,7 @@ read (int fd, void *buf, size_t size)
 #ifdef ENABLE_HORUS
   /* Horus function only for regular file and successful read. */
   if (S_ISREG (statbuf.st_mode) && nbyte > 0)
-    horus_read (fd, fdpos, buf, (size_t) nbyte);
+    horus_pread (fd, buf, (size_t) nbyte, fdpos);
 #endif /*ENABLE_HORUS*/
 
   return (ssize_t) nbyte;
@@ -83,7 +83,7 @@ write (int fd, const void *buf, size_t size)
 
 #ifdef ENABLE_HORUS
   if (S_ISREG (statbuf.st_mode))
-    horus_write (fd, fdpos, (void *) buf, size);
+    horus_pwrite (fd, (void *) buf, size, fdpos);
 #endif /*ENABLE_HORUS*/
 
   nbyte = (int) syscall (SYS_write, fd, buf, size);
