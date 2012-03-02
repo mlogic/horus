@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 
   if (argc < 5)
   {
-    fprintf(stderr, "usage %d server filename x y\n", argv[0]);
+    fprintf(stderr, "usage %s server filename x y\n", argv[0]);
     exit(1);
   }
 
@@ -39,6 +39,6 @@ int main(int argc, char *argv[])
     if (resp->err == 0)
     	printf("key = %s\n", resp->key);
     else
-        printf("err = %d", resp->err);
+        printf("err = %d\n", resp->err);
 }
    

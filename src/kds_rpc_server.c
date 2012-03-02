@@ -33,6 +33,8 @@ struct key_rtn * keyreq_1_svc(struct key_request *input, struct svc_req *req)
   if (fd < 0)
   {
       fprintf (stderr, "Unable to open %s!\n", filename);
+      key_out.key = strdup("");
+      key_out.err = EIO;
       goto exit;
   }
   else
@@ -43,6 +45,8 @@ struct key_rtn * keyreq_1_svc(struct key_request *input, struct svc_req *req)
     {
       fprintf(stderr, "Range for %s not configured for client\n",
                    filename);
+      key_out.key = strdup("");
+      key_out.err = EINVAL;
       goto exit;
     }
 
@@ -51,6 +55,8 @@ struct key_rtn * keyreq_1_svc(struct key_request *input, struct svc_req *req)
     if (ret < 0)
     {
       fprintf(stderr, "Unable to read master-key ret = %d!\n",ret);
+      key_out.key = strdup("");
+      key_out.err = EINVAL;
       goto exit;
     }
     master[ret+1] = '\0';  /* ret actually has length of master-key */
@@ -74,13 +80,15 @@ struct key_rtn * keyreq_1_svc(struct key_request *input, struct svc_req *req)
           {
             fprintf (stderr, "Error: horus_key_by_master error %d\n",
                           ret);
+            key_out.key = strdup("");
             key_out.err = ret;
           }
     }
     else
     {
-       fprintf(stderr, "Access denied!");
+       fprintf(stderr, "Access denied!\n");
        key_out.err = EPERM;
+       key_out.key = strdup("");
     }
   }
 exit:
