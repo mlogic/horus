@@ -1,18 +1,37 @@
 const MAXNAMELEN = 4096;
+const MAXKEYS = 20; /* Should be sufficient */
 
-struct key_request {
-  string filename<MAXNAMELEN>;
+struct range
+{
   int x;
   int y;
 };
 
-struct key_rtn {
-  string key<100>;
+
+struct rangekey
+{
+  string key <41>;
+  int x;
+  int y;
   int err;
 };
 
-program KDS_RPC {
-  version KEYREQVERS {
-    struct key_rtn KEYREQ(struct key_request) = 1;
+struct key_request
+{
+  string filename < MAXNAMELEN >;
+  range ranges <MAXKEYS>;
+};
+
+struct key_rtn
+{
+  rangekey keys <MAXKEYS>;
+  int err;
+};
+
+program KDS_RPC
+{
+  version KEYREQVERS
+  {
+    struct key_rtn KEYREQ (struct key_request) = 1;
   } = 1;
-} = 22855;
+} = 20380;
