@@ -1,5 +1,5 @@
 
-AM_CPPFLAGS = -I$(top_srcdir)/lib @OPENSSL_INCLUDES@
+AM_CPPFLAGS = -I$(top_srcdir)/lib -I$(top_srcdir)/aes @OPENSSL_INCLUDES@
 AM_LDFLAGS = -L$(top_srcdir)/lib @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@
 
 noinst_PROGRAMS = test-shell test-command-shell test-pthread test-openssl kds_rpc_server kds_rpc_client

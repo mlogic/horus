@@ -43,6 +43,8 @@
 /* Actual branch factor is 2^BRANCH_FACTOR_BITS, i.e., 2^2 = 4. */
 #define BRANCH_FACTOR_BITS     2
 #define MIN_CHUNK_SIZE      4096
+#define HORUS_BLOCK_SIZE (MIN_CHUNK_SIZE)
+#define HORUS_KEY_LEN    (160/8)
 
 #include <minmax.h>
 
@@ -50,9 +52,30 @@ extern int debug;
 
 void horus_init ();
 
-int horus_open (int fd, const char *path, int flag, mode_t mode);
-ssize_t horus_read (int fd, off_t fdpos, void *buf, size_t size);
-ssize_t horus_write (int fd, off_t fdpos, void *buf, size_t size);
-int horus_close (int fd);
+int horus_open (const int fd, const char *path, int flag, mode_t mode);
+ssize_t horus_pread (int fd, void *buf, size_t size, off_t fdpos);
+ssize_t horus_pwrite (int fd, void *buf, size_t size, off_t fdpos);
+ssize_t horus_read (const int fd, void *buf, size_t nbyte);
+ssize_t horus_write (const int fd, void *buf, size_t nbyte);
+int horus_close (const int fd);
+/** Add Kx,y
+ *  If key_len > HORUS_KEY_LEN, key will be truncated to HORUS_KEY_LEN
+ */
+int horus_add_key (const int fd, const void *key, size_t key_len, const int x, const int y);
+/** Set KHT properties
+ *  \param fd file description
+ *  \param depth depth of KHT
+ *  \param leaf_block_size block size of leaf level
+ *  \param branching_factor an array of each level's branching factor
+ */
+void horus_set_kht (const int fd, int depth, size_t leaf_block_size, const int *branching_factor);
+/** Get K(x,y)
+ *  \param out_key a output buffer for key of length HORUS_KEY_LENGH
+ * You can only get keys lower in the keyed hash tree than what you
+ * already have */
+int horus_get_key (const int fd, void **out_key, const int x, const int y);
+/* Get the key for block by ID
+ */
+int horus_get_leaf_block_key (const int fd, void **out_key, size_t block_id);
 
 #endif /*_HORUS_H_*/

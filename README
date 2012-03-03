@@ -1,3 +1,5 @@
+Pre-requirement for Linux:
+  Fedora: gcc, check-devel
 
 Compile:
   % (optional) sh -x autogen.sh
