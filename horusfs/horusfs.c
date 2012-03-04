@@ -1,4 +1,5 @@
 /*
+ * Derived from :
   FUSE: Filesystem in Userspace
   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
@@ -28,19 +29,34 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <limits.h>
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
 
 #include <horus_attr.h>
 #include <horus_crypt.h>
+#include <horus_key.h>
+#include <horusfs.h>
+#include <rpc/rpc.h>
+#include <kds_rpc.h>
+
+
+static void horusfs_fullpath (char fpath[PATH_MAX], const char *path)
+{
+  strcpy(fpath, HORUSFS_DATA->rootdir);
+  strncat(fpath, path, PATH_MAX);
+}
 
 static int
 xmp_getattr (const char *path, struct stat *stbuf)
 {
   int res;
+  char fpath[PATH_MAX];
 
-  res = lstat (path, stbuf);
+  horusfs_fullpath(fpath, path);
+
+  res = lstat (fpath, stbuf);
   if (res == -1)
     return -errno;
 
@@ -79,11 +95,14 @@ xmp_readdir (const char *path, void *buf, fuse_fill_dir_t filler,
 {
   DIR *dp;
   struct dirent *de;
+  char fpath[PATH_MAX];
 
   (void) offset;
   (void) fi;
 
-  dp = opendir (path);
+  horusfs_fullpath(fpath, path);
+
+  dp = opendir (fpath);
   if (dp == NULL)
     return -errno;
 
@@ -141,8 +160,12 @@ static int
 xmp_unlink (const char *path)
 {
   int res;
+  char fpath[PATH_MAX];
 
-  res = unlink (path);
+
+  horusfs_fullpath(fpath, path);
+
+  res = unlink (fpath);
   if (res == -1)
     return -errno;
 
@@ -255,14 +278,18 @@ static int
 xmp_open (const char *path, struct fuse_file_info *fi)
 {
   int res;
+  char fpath[PATH_MAX];
 
-  res = open (path, fi->flags);
+  horusfs_fullpath(fpath, path);
+
+  res = open (fpath, fi->flags);
   if (res == -1)
     return -errno;
 
   close (res);
   return 0;
 }
+
 
 static int
 xmp_read (const char *path, char *buf, size_t size, off_t offset,
@@ -275,12 +302,51 @@ xmp_read (const char *path, char *buf, size_t size, off_t offset,
   char *kvalue;
   int decrypt = 0;
 
+  char fpath[PATH_MAX];
+
+  CLIENT *cl;
+  struct key_request req;
+  struct key_rtn *resp;
+  char *server;
+  int x,y;
+
   (void) fi;
-  fd = open (path, O_RDONLY);
+  horusfs_fullpath(fpath, path);
+  fd = open (fpath, O_RDONLY);
   if (fd == -1)
     return -errno;
+
+  server = HORUSFS_DATA->kds_server;
+  cl = clnt_create (server, KDS_RPC, KEYREQVERS, "udp");
+  if (cl == NULL)
+  {
+    clnt_pcreateerror (server);
+    abort ();
+  }
+
+  x = 9;
+  y = offset / block_size[9];
+ 
+  req.filename = fpath;
+  req.ranges.ranges_len = 1 ;
+  req.ranges.ranges_val = calloc(sizeof(struct range), 1);
+  req.ranges.ranges_val[0].x = x;
+  req.ranges.ranges_val[0].y = y;
+
+  resp = keyreq_1 (&req, cl);
+  if (resp == NULL)
+  {
+    clnt_perror (cl, "call failed:");
+    abort();
+  }
+  clnt_destroy (cl);
+  if (resp->keys.keys_val[0].err == 0)
+    printf ("key = %s\n", resp->keys.keys_val[0].key);
+  else
+    printf ("key err = %s\n", strerror(resp->keys.keys_val[0].err));
+
   /*
-     err = lgetxattr(path, "user.horus.key.value", kvalue, KEY_VALUE_SIZE);
+e    err = lgetxattr(path, "user.horus.key.value", kvalue, KEY_VALUE_SIZE);
      if (err > 0)
      {
      err = lgetxattr(path, "user.horus.key.type", ktype, KEY_TYPE_SIZE);
@@ -307,10 +373,14 @@ xmp_write (const char *path, const char *buf, size_t size,
   int res;
   char *ktype = "master";
   char *kvalue = "nakul";
+  char fpath[PATH_MAX];
+
+
+  horusfs_fullpath(fpath, path);
 
 
   (void) fi;
-  fd = open (path, O_WRONLY);
+  fd = open (fpath, O_WRONLY);
   if (fd == -1)
     return -errno;
   horus_coding (0, offset, buf, size, ktype, kvalue);
@@ -326,8 +396,12 @@ static int
 xmp_statfs (const char *path, struct statvfs *stbuf)
 {
   int res;
+  char fpath[PATH_MAX];
 
-  res = statvfs (path, stbuf);
+
+  horusfs_fullpath(fpath, path);
+
+  res = statvfs (fpath, stbuf);
   if (res == -1)
     return -errno;
 
@@ -357,6 +431,18 @@ xmp_fsync (const char *path, int isdatasync, struct fuse_file_info *fi)
   return 0;
 }
 
+static void *xmp_init(struct fuse_conn_info *conn)
+{
+  return HORUSFS_DATA;
+}
+
+static void xmp_destroy(void *private_data)
+{
+  if (((struct horusfs_state *)private_data)->kds_server != NULL)
+  {
+    free(((struct horusfs_state *)private_data)->kds_server);
+  }
+}
 #ifdef HAVE_SETXATTR
 /* xattr operations are optional and can safely be left unimplemented */
 static int
@@ -423,6 +509,8 @@ static struct fuse_operations xmp_oper = {
   .statfs = xmp_statfs,
   .release = xmp_release,
   .fsync = xmp_fsync,
+  .init = xmp_init,
+  .destroy = xmp_destroy,
 #ifdef HAVE_SETXATTR
   .setxattr = xmp_setxattr,
   .getxattr = xmp_getxattr,
@@ -431,9 +519,36 @@ static struct fuse_operations xmp_oper = {
 #endif
 };
 
+void horusfs_usage()
+{
+    fprintf(stderr, "usage: horusfs kds_server rootDir mountPoint\n");
+    abort();
+}
 int
 main (int argc, char *argv[])
 {
+  int i,ret;
+  struct horusfs_state *horusfs_data;
   umask (0);
-  return fuse_main (argc, argv, &xmp_oper, NULL);
+  
+  horusfs_data = calloc(sizeof(struct horusfs_state),1);
+  if (horusfs_data == NULL)
+  {
+    fprintf(stderr, "Memory allocation failure!");
+    abort(); 
+  }
+
+  for (i = 1; (i < argc) && (argv[i][0] == '-'); i++)
+  {
+    if (argv[i][1] == 'o')
+      i++;
+  }
+  if ((argc - i) != 3)
+    horusfs_usage();
+  horusfs_data->kds_server = strdup(argv[i]);
+  horusfs_data->rootdir = realpath(argv[i+1], NULL);
+  argv[i] = argv[i+2];
+  argc = argc - 2;
+
+  return fuse_main (argc, argv, &xmp_oper, horusfs_data);
 }
