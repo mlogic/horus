@@ -308,35 +308,45 @@ horus_get_key (const int fd, void **out_key, const int x, const int y)
   void *parent_key;
   struct _key_store_entry *p = find_key_by_fd (fd);
 
+  // sanity check
   if (NULL == p)
     {
       perror (__func__);
       abort ();
     }
-
   if (x > p->depth)
     {
       perror ("Trying to get a key at a level deeper than the depth of KHT.");
       abort ();
     }
+
+  // handling master key
   if (x == 0)
     {
-      if (y != 0)
-	{
-	  perror ("y != 0 at level 0");
-	}
       *out_key = p->master_key;
       return *out_key == NULL ? -1 : 0;
     }
 
+  // check if the key exists
   key_vec_x = p->key_vec[x-1];
-  
   if ((*out_key = vectorx_get (key_vec_x, y)) == NULL)
     {
+      // need to calculate it
       int key_len;
-      int parent_branching_factor = p->branching_factor[x-2];
+      int parent_x, parent_y;
+      if (x == 1)
+	{
+	  parent_x = 0;
+	  parent_y = 0;
+	}
+      else
+	{
+	  int parent_branching_factor = p->branching_factor[x-2];
+	  parent_x = x - 1;
+	  parent_y = y / parent_branching_factor;
+	}
       // get parent key and compute K(x,y)
-      horus_get_key (fd, &parent_key, x - 1, y / parent_branching_factor);
+      horus_get_key (fd, &parent_key, parent_x, parent_y);
       if (NULL == parent_key)
 	{
 	  *out_key = NULL;
