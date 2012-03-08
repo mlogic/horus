@@ -13,7 +13,7 @@
 #ifndef __LINUX_COMPILER_H
 #define __LINUX_COMPILER_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #ifdef __CHECKER__
 # define __user		__attribute__((noderef, address_space(1)))
@@ -178,7 +178,7 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect);
 
 #endif /* __KERNEL__ */
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #ifdef __KERNEL__
 /*

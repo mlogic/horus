@@ -15,7 +15,7 @@
 
 #include "linux-asm-types.h"
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #ifdef	__KERNEL__
 
 #define DECLARE_BITMAP(name,bits) \
@@ -259,5 +259,5 @@ struct rcu_head {
 };
 
 #endif	/* __KERNEL__ */
-#endif /*  __ASSEMBLY__ */
+#endif /*  __ASSEMBLER__ */
 #endif /* _LINUX_TYPES_H */

@@ -37,8 +37,11 @@ int main(int argc, char **argv[])
   memset (enc_buf, 0, sizeof(enc_buf));
 
   struct aes_xts_cipher *c = aes_xts_init();
-  if (!aes_xts_setkey (c, key, 16))
-    abort ();
+  if (aes_xts_setkey (c, key, 16) != 0)
+    {
+      printf ("aes_xts_setkey error!");
+      abort ();
+    }
 
   aes_xts_encrypt (c, enc_buf, plain_buf, test_buf_size, iv);
 

@@ -47,11 +47,9 @@ int aes_expand_key(struct aes_cipher *ctx, const u8 *in_key,
 		   unsigned int key_len);
 
 struct aes_cipher *aes_init(void);
-int aes_setkey(struct aes_cipher *ctx, const u8 *key,
-	       unsigned int keylen);
+int aes_set_key(const struct aes_cipher *ctx, const u8 *key,
+		unsigned int keylen);
 void aes_encrypt (const struct aes_cipher *ctx, u8 *dst, const u8 *src);
 void aes_decrypt (const struct aes_cipher *ctx, u8 *dst, const u8 *src);
-
-
 
 #endif /* _AES_H */

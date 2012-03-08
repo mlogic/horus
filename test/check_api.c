@@ -6,7 +6,7 @@
  *  Yan Li <yanli@ucsc.edu>
  *
  * Test scheme:
-
+ *
  * 1: set a master key, write two 4KB blocks into a test file using
  *    Horus API, close file
  * 2: re-open file, make sure they can be read correctly

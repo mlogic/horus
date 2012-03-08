@@ -44,12 +44,12 @@ int aes_xts_setkey(struct aes_xts_cipher *ctx, const u8 *key,
    * one to encrypt and decrypt the data */
 
   /* tweak cipher, uses Key2 i.e. the second half of *key */
-  err = aes_setkey(ctx->tweak, key + keylen/2, keylen/2);
+  err = aes_set_key(ctx->tweak, key + keylen/2, keylen/2);
   if (err)
     return err;
 
   /* data cipher, uses Key1 i.e. the first half of *key */
-  err = aes_setkey(ctx->child, key, keylen/2);
+  err = aes_set_key(ctx->child, key, keylen/2);
   if (err)
     return err;
 

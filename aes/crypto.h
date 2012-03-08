@@ -13,6 +13,12 @@
 #ifndef _CRYPTO_H
 #define _CRYPTO_H
 
+#if __LP64__
+#define CONFIG_X86_64
+#else
+#define CONFIG_X86_32
+#endif
+
 typedef signed char s8;
 typedef unsigned char u8;
 

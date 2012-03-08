@@ -37,6 +37,7 @@ fi
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
+AM_PROG_AS
 
 # Checks for libraries.
 PKG_CHECK_MODULES([CHECK], [check >= 0.9.8])
