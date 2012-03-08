@@ -9,7 +9,6 @@ AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_PREFIX_DEFAULT($HOME)
 
-CFLAGS="$CFLAGS -g -O0 -Wall -D_FILE_OFFSET_BITS=64"
 # must explicitly reference lpthread when compiling on Fedora
 # see https://fedoraproject.org/wiki/UnderstandingDSOLinkChange
 PTHREAD_LIBS="-lpthread"
@@ -32,6 +31,20 @@ if test "$enable_log_syslog" != "no"; then
 fi
 if test "$enable_log_stderr" = "yes"; then
   AC_DEFINE(ENABLE_STDERR,,Logging to stderr)
+fi
+
+AC_ARG_ENABLE([debug],
+     [  --enable-debug    Turn on debugging],
+     [case "${enableval}" in
+       yes) debug=true ;;
+       no)  debug=false ;;
+        *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+     esac],[debug=false])
+CFLAGS="$CFLAGS -Wall -D_FILE_OFFSET_BITS=64"
+if test x$debug = xtrue; then
+   CFLAGS="$CFLAGS -g -O0"
+else
+   CFLAGS="$CFLAGS -O2"
 fi
 
 AC_ARG_ENABLE([aseni],
