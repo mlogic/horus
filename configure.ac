@@ -34,6 +34,25 @@ if test "$enable_log_stderr" = "yes"; then
   AC_DEFINE(ENABLE_STDERR,,Logging to stderr)
 fi
 
+AC_ARG_ENABLE([aseni],
+     [  --enable-intel-aesni    Turn on Intel AESNI],
+     [case "${enableval}" in
+       yes) intel_aesni=true ;;
+       no)  intel_aesni=false ;;
+        *) AC_MSG_ERROR([bad value ${enableval} for --enable-intel-aesni]) ;;
+     esac],[intel_aesni=false])
+AM_CONDITIONAL([INTEL_AESNI], [test x$intel_aesni = xtrue])
+
+AC_ARG_ENABLE([fuse],
+     [  --enable-fuse    Build FUSE support],
+     [case "${enableval}" in
+       yes) fuse=true ;;
+       no)  fuse=false ;;
+        *) AC_MSG_ERROR([bad value ${enableval} for --enable-fuse]) ;;
+     esac],[fuse=true])
+AM_CONDITIONAL([FUSE], [test x$fuse = xtrue])
+
+
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O

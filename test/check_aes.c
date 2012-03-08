@@ -8,10 +8,10 @@ int debug = 0;
 /** Test encrypt/decrypt
  * Encrypt a string, then decrypt it, compare with plaintext.
  */
-int main(int argc, char **argv[])
+int main(int argc, char **argv)
 {
   const int test_buf_size=32;
-  const int keylen=16;
+  const int keylen=16*2; // xts requires two keys
   u8 key[keylen];
   u8 iv[keylen];
   u8 plain_buf[test_buf_size];
@@ -37,7 +37,7 @@ int main(int argc, char **argv[])
   memset (enc_buf, 0, sizeof(enc_buf));
 
   struct aes_xts_cipher *c = aes_xts_init();
-  if (aes_xts_setkey (c, key, 16) != 0)
+  if (aes_xts_setkey (c, key, keylen) != 0)
     {
       printf ("aes_xts_setkey error!");
       abort ();

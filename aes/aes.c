@@ -1270,7 +1270,7 @@ int aes_expand_key(struct aes_cipher *ctx, const u8 *in_key,
 
 /**
  * aes_set_key - Set the AES key.
- * @tfm:	The %crypto_tfm that is used in the context.
+ * @ctx:	The aes_cipher context that is used in the context.
  * @in_key:	The input key.
  * @key_len:	The size of the key.
  *
@@ -1280,7 +1280,7 @@ int aes_expand_key(struct aes_cipher *ctx, const u8 *in_key,
  * retrieved with crypto_tfm_ctx().
  */
 int aes_set_key(struct aes_cipher *ctx, const u8 *in_key,
-	       unsigned int key_len)
+		unsigned int key_len)
 {
   int ret;
 
