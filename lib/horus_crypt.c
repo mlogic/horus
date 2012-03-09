@@ -26,7 +26,7 @@ horus_coding (int fd, int fdpos, char *buf, size_t nbyte,
   off_t offset;
   int ncopy;
   char key[SHA_DIGEST_LENGTH];
-  int key_len;
+  size_t key_len;
 
   rest = nbyte;
   bufp = 0;

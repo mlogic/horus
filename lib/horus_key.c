@@ -17,19 +17,6 @@
 #include <horus_key.h>
 #include <openssl/sha.h>
 
-unsigned int block_size[] = {
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 9),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 8),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 7),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 6),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 5),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 4),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 3),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 2),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 1),
-  MIN_CHUNK_SIZE << (BRANCH_FACTOR_BITS * 0),
-};
-
 struct _key_store_entry *key_store = NULL, *key_store_tail = NULL;
 
 void
@@ -153,138 +140,6 @@ block_key (char *key, size_t *key_len,
   return key;
 }
 
-int
-horus_key_from_to (char *key, int *key_len, int x, int y,
-                   char *parent, int parent_len, int parent_x, int parent_y)
-{
-  char next_parent[SHA_DIGEST_LENGTH * 2 + 1];
-  char ibuf[SHA_DIGEST_LENGTH];
-  int next_parent_len, ibuf_len;
-
-  if (! log_on)
-    log_init ();
-
-  if (debug)
-    syslog (LOG_INFO, "%s(): x = %d, y = %d, parent_x = %d, parent_y = %d",
-            __func__, x, y, parent_x, parent_y);
-
-  /* Base case 1 */
-  if (parent_x == x)
-    {
-      if (parent_y != y)
-        {
-          syslog (LOG_WARNING, "%s(): range mismatch: "
-                  "x = %d, y = %d, parent_x = %d, parent_y = %d",
-                  __func__, x, y, parent_x, parent_y);
-          return -1;
-        }
-
-      /* key = int(parent), because key == parent */
-      key_to_value (key, key_len, parent);
-
-      return 0;
-    }
-
-  /* Base case 2 */
-  if (parent_x == x - 1)
-    {
-      if (parent_y != y / 4)
-        {
-          syslog (LOG_WARNING, "%s(): range mismatch: "
-                  "x = %d, y = %d, parent_x = %d, parent_y = %d",
-                  __func__, x, y, parent_x, parent_y);
-          return -1;
-        }
-
-      block_key (key, key_len, parent, parent_len, x, y);
-      return 0;
-    }
-
-  /* Recursive */
-  horus_key_from_to (ibuf, &ibuf_len, x - 1, y / 4,
-                     parent, parent_len, parent_x, parent_y);
-
-  /* parent = str(key) */
-  key_to_string (next_parent, sizeof (next_parent), ibuf, ibuf_len);
-  next_parent_len = strlen (next_parent);
-
-  block_key (key, key_len, next_parent, next_parent_len, x, y);
-
-  return 0;
-}
-
-int
-horus_key_by_master (char *key, int *key_len, int x, int y,
-                      char *master, int master_len)
-{
-  char key00[SHA_DIGEST_LENGTH * 2 + 1];
-  char ibuf[SHA_DIGEST_LENGTH];
-  int key00_len, ibuf_len;
-
-  if (! log_on)
-    log_init ();
-
-  if (debug)
-    syslog (LOG_INFO, "%s(): x = %d, y = %d", __func__, x, y);
-
-  block_key (ibuf, &ibuf_len, master, master_len, 0, 0);
-  key_to_string (key00, sizeof (key00), ibuf, ibuf_len);
-  key00_len = strlen (key00);
-
-  horus_key_from_to (key, key_len, x, y, key00, key00_len, 0, 0);
-  return 0;
-}
-
-void
-horus_key (char *key, size_t *key_len, int filepos,
-           char *ktype, char *kvalue)
-{
-  int x, y;
-  int rkey_x, rkey_y;
-  char keybuf[SHA_DIGEST_LENGTH * 2 + 1];
-
-  x = 9;
-  if (0 != filepos % MIN_CHUNK_SIZE)
-    {
-      log_error ("Non-block-aligned access is not supported yet.");
-      abort ();
-    }
-  y = filepos / MIN_CHUNK_SIZE;
-
-  if (! ktype || ! kvalue)
-    {
-      *key_len = 0;
-      return;
-    }
-
-  if (! strcasecmp (ktype, "master"))
-    {
-      syslog (LOG_INFO, "key type: master");
-      syslog (LOG_INFO, "key value: %s", kvalue);
-      horus_key_by_master (key, key_len, x, y, kvalue, strlen (kvalue));
-      key_to_string (keybuf, sizeof (keybuf), key, *key_len);
-      syslog (LOG_INFO, "K(%d,%d) = %s", x, y, keybuf);
-    }
-  else
-    {
-      sscanf (ktype, "%d,%d", &rkey_x, &rkey_y);
-      syslog (LOG_INFO, "key type: range: %d,%d", rkey_x, rkey_y);
-      syslog (LOG_INFO, "key value: %s", kvalue);
-      horus_key_from_to (key, key_len, x, y,
-                         kvalue, strlen (kvalue), rkey_x, rkey_y);
-      key_to_string (keybuf, sizeof (keybuf), key, *key_len);
-      syslog (LOG_INFO, "K(%d,%d) = %s", x, y, keybuf);
-    }
-}
-
-void
-horus_get_key_from_env (char **ktype, char **kvalue)
-{
-  *ktype = getenv ("HORUS_KEY_TYPE");
-  *kvalue = getenv ("HORUS_KEY_VALUE");
-}
-
-
 /** Scan key_store and look for entry of fd
  */
 struct _key_store_entry*
@@ -302,10 +157,11 @@ find_key_by_fd (const int fd)
 }
 
 int
-horus_get_key (const int fd, void **out_key, const int x, const int y)
+horus_get_key (const int fd, void *out_key, const int x, const int y)
 {
   struct vectorx *key_vec_x;
-  void *parent_key;
+  u8 parent_key[HORUS_KEY_LEN];
+  void *my_key;
   struct _key_store_entry *p = find_key_by_fd (fd);
 
   // sanity check
@@ -323,47 +179,44 @@ horus_get_key (const int fd, void **out_key, const int x, const int y)
   // handling master key
   if (x == 0)
     {
-      *out_key = p->master_key;
-      return *out_key == NULL ? -1 : 0;
+      if (p->master_key)
+	{
+	  memcpy (out_key, p->master_key, HORUS_KEY_LEN);
+	  return 0;
+	}
+      else
+	return -1;
     }
 
   // check if the key exists
   key_vec_x = p->key_vec[x-1];
-  if ((*out_key = vectorx_get (key_vec_x, y)) == NULL)
+  if ((my_key = vectorx_get (key_vec_x, y)) != NULL)
     {
-      // need to calculate it
-      int key_len;
-      int parent_x, parent_y;
-      if (x == 1)
-	{
-	  parent_x = 0;
-	  parent_y = 0;
-	}
-      else
-	{
-	  int parent_branching_factor = p->branching_factor[x-2];
-	  parent_x = x - 1;
-	  parent_y = y / parent_branching_factor;
-	}
-      // get parent key and compute K(x,y)
-      horus_get_key (fd, &parent_key, parent_x, parent_y);
-      if (NULL == parent_key)
-	{
-	  *out_key = NULL;
-	  return -1;
-	}
-
-      *out_key = malloc (EVP_MAX_MD_SIZE);
-      if (*out_key == NULL)
-	{
-	  perror (__func__);
-	  abort ();
-	}
-      
-      block_key (*out_key, &key_len, parent_key, HORUS_KEY_LEN, x, y);
-      vectorx_set (key_vec_x, y, *out_key);
+      // we already have the key, return it
+      memcpy (out_key, my_key, HORUS_KEY_LEN);
       return 0;
     }
+
+  // no key exists, we need to calculate it now
+  size_t key_len;
+  int parent_x, parent_y;
+  if (x == 1)
+    {
+      parent_x = 0;
+      parent_y = 0;
+    }
+  else
+    {
+      int parent_branching_factor = p->branching_factor[x-2];
+      parent_x = x - 1;
+      parent_y = y / parent_branching_factor;
+    }
+  // get parent key and compute K(x,y)
+  if (0 != horus_get_key (fd, parent_key, parent_x, parent_y))
+      return -1;
+
+  block_key (out_key, &key_len, parent_key, HORUS_KEY_LEN, x, y);
+  vectorx_set (key_vec_x, y, duplicate_key (out_key, HORUS_KEY_LEN));
   
   return 0;
 }

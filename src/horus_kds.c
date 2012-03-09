@@ -320,26 +320,27 @@ DEFINE_COMMAND (get_range_key,
 
 
     /* Convert x,y into start-block  and end-block  number */
-    start = (y * block_size[x]/MIN_CHUNK_SIZE);
-    end = ((y+1) * block_size[x]/MIN_CHUNK_SIZE);
+    // FIXME use horus_get_block_size() and horus_get_key()
+    /* start = (y * block_size[x]/MIN_CHUNK_SIZE); */
+    /* end = ((y+1) * block_size[x]/MIN_CHUNK_SIZE); */
 
-    if ((start >=start_block) && (end<=end_block))
-    {
-          snprintf (parent, sizeof (parent), "%s", master);
-          parent_len = strlen (master);
-          ret = horus_key_by_master (key, &key_len, x, y, parent, parent_len);
-          if (ret == 0)
-            shell_printf (csh->shell, "%s", print_key (key, key_len));
-          else
-            shell_printf (csh->shell, "Error: horus_key_by_master error %d",
-                          ret);
-          shell_linefeed (csh->shell);
-    }
-    else
-    {
-       shell_printf(csh->shell, "Access denied!");
-       shell_linefeed(csh->shell);
-    }
+    /* if ((start >=start_block) && (end<=end_block)) */
+    /* { */
+    /*       snprintf (parent, sizeof (parent), "%s", master); */
+    /*       parent_len = strlen (master); */
+    /*       ret = horus_key_by_master (key, &key_len, x, y, parent, parent_len); */
+    /*       if (ret == 0) */
+    /*         shell_printf (csh->shell, "%s", print_key (key, key_len)); */
+    /*       else */
+    /*         shell_printf (csh->shell, "Error: horus_key_by_master error %d", */
+    /*                       ret); */
+    /*       shell_linefeed (csh->shell); */
+    /* } */
+    /* else */
+    /* { */
+    /*    shell_printf(csh->shell, "Access denied!"); */
+    /*    shell_linefeed(csh->shell); */
+    /* } */
   }
 exit:
   if (fd > 0)

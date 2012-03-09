@@ -73,9 +73,12 @@ void horus_set_kht (const int fd, int depth, size_t leaf_block_size, const int *
  *  \param out_key a output buffer for key of length HORUS_KEY_LENGH
  * You can only get keys lower in the keyed hash tree than what you
  * already have */
-int horus_get_key (const int fd, void **out_key, const int x, const int y);
+int horus_get_key (const int fd, void *out_key, const int x, const int y);
 /* Get the key for block by ID
+ * \param out_key A buffer of at least size HORUS_KEY_LEN
  */
-int horus_get_leaf_block_key (const int fd, void **out_key, size_t block_id);
+int horus_get_leaf_block_key (const int fd, void *out_key, size_t block_id);
+/* Get block size at level x */
+ssize_t horus_get_block_size (const int fd, const int x);
 
 #endif /*_HORUS_H_*/

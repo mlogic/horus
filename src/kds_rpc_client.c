@@ -3,7 +3,7 @@
 #include <fcntl.h>
 #include <rpc/rpc.h>
 #include "kds_rpc.h"
-#include "benchmark.h"
+//#include "benchmark.h"
 
 int
 main (int argc, char *argv[])

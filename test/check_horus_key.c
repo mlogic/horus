@@ -19,7 +19,7 @@ START_TEST (test_horus_set_get_key)
   const int fd = 9;
   const char key_2_0[] = "key_2_0";
   const char key_3_3[] = "key_3_3";
-  void *key_buf;
+  char key_buf[HORUS_KEY_LEN];
   const int kht_branching_factor[2] = { 2, 2 };
 
   // Set a KHT with 3 levels
@@ -33,35 +33,44 @@ START_TEST (test_horus_set_get_key)
   horus_set_kht (fd, 3, 4096, kht_branching_factor);
   // set K(2,0)
   horus_add_key (fd, key_2_0, strnlen (key_2_0, HORUS_KEY_LEN), 2, 0);
+
+  // make sure Horus get the block size at each level right
+  fail_unless (4096 == horus_get_block_size (fd, 3),
+	       "block_size at level 3 not equals 4096");
+  fail_unless (4096*2 == horus_get_block_size (fd, 2),
+	       "block_size at level 2 not equals 4096*2");
+  fail_unless (4096*2*2 == horus_get_block_size (fd, 1),
+	       "block_size at level 1 not equals 4096*2*2");
+
   // we should be able to get K(3,0), K(3,1), but not K(3,2) nor K(3,3)
-  fail_unless (0 == horus_get_key (fd, &key_buf, 3, 0),
+  fail_unless (0 == horus_get_key (fd, key_buf, 3, 0),
 	       "Can't get K(3,0)");
-  fail_unless (0 == horus_get_key (fd, &key_buf, 3, 1),
+  fail_unless (0 == horus_get_key (fd, key_buf, 3, 1),
 	       "Can't get K(3,1)");
-  fail_unless (0 != horus_get_key (fd, &key_buf, 3, 2),
+  fail_unless (0 != horus_get_key (fd, key_buf, 3, 2),
 	       "Shouldn't be able to get K(3,2)");
-  fail_unless (0 != horus_get_key (fd, &key_buf, 3, 3),
+  fail_unless (0 != horus_get_key (fd, key_buf, 3, 3),
 	       "Shouldn't be able to get K(3,3)");
 
   // Add K(3,3), then we should be able to access K(3,3), K(3,2)
   horus_add_key (fd, key_3_3, strnlen (key_3_3, HORUS_KEY_LEN), 3, 3);
-  fail_unless (0 == horus_get_key (fd, &key_buf, 3, 0),
+  fail_unless (0 == horus_get_key (fd, key_buf, 3, 0),
 	       "Can't get K(3,0)");
-  fail_unless (0 == horus_get_key (fd, &key_buf, 3, 1),
+  fail_unless (0 == horus_get_key (fd, key_buf, 3, 1),
 	       "Can't get K(3,1)");
-  fail_unless (0 != horus_get_key (fd, &key_buf, 3, 2),
+  fail_unless (0 != horus_get_key (fd, key_buf, 3, 2),
 	       "Shouldn't be able to get K(3,2)");
-  fail_unless (0 == horus_get_key (fd, &key_buf, 3, 3),
+  fail_unless (0 == horus_get_key (fd, key_buf, 3, 3),
 	       "Can't get K(3,3) even after set 3,3");
   
   // Test horus_get_leaf_block_key
-  fail_unless (0 == horus_get_leaf_block_key (fd, &key_buf, 0),
+  fail_unless (0 == horus_get_leaf_block_key (fd, key_buf, 0),
 	       "Can't get block key of leaf 0");
-  fail_unless (0 == horus_get_leaf_block_key (fd, &key_buf, 1),
+  fail_unless (0 == horus_get_leaf_block_key (fd, key_buf, 1),
 	       "Can't get block key of leaf 1");
-  fail_unless (0 != horus_get_leaf_block_key (fd, &key_buf, 2),
+  fail_unless (0 != horus_get_leaf_block_key (fd, key_buf, 2),
 	       "Shouldn't be able to get block key of leaf 2");
-  fail_unless (0 == horus_get_leaf_block_key (fd, &key_buf, 3),
+  fail_unless (0 == horus_get_leaf_block_key (fd, key_buf, 3),
 	       "Can't get block key of leaf 3");
 }
 END_TEST

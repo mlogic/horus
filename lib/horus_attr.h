@@ -35,6 +35,8 @@ struct horus_ea_config
 {
   unsigned char reserved[4];    /* Maybe store magic number or some other bits */
   unsigned char entry_count[4];
+  unsigned char kht_depth[4];
+  unsigned char branching_factor[4];
   unsigned char master_key[HORUS_MASTERKEY_LEN];
   struct horus_ea_config_entry entry_table[100];        /* 100 * 12 = 1200 bytes. Should be sufficient for testing */
 };

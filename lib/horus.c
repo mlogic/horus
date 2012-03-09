@@ -111,7 +111,7 @@ ssize_t
 horus_read (int fd, void *buf, size_t nbyte)
 {
   void *encrypted_buf = NULL;
-  void *horus_block_key = NULL;
+  u8 horus_block_key[HORUS_KEY_LEN];
   u8 iv[HORUS_KEY_LEN];
   size_t nbyte_remain = nbyte;
   size_t block_size;
@@ -142,7 +142,7 @@ horus_read (int fd, void *buf, size_t nbyte)
   while (nbyte_remain > 0)
     {
       block_id = fdpos / block_size;
-      horus_get_leaf_block_key (fd, &horus_block_key, block_id);
+      horus_get_leaf_block_key (fd, horus_block_key, block_id);
       aes_xts_setkey (key_info->cipher, horus_block_key, HORUS_KEY_LEN);
       // Use block_id as IV
       memset (iv, 0, sizeof (iv));
@@ -172,7 +172,7 @@ ssize_t
 horus_write (int fd, void *buf, size_t nbyte)
 {
   void *encrypted_buf = NULL;
-  void *horus_block_key = NULL;
+  u8 horus_block_key[HORUS_KEY_LEN];
   u8 iv[HORUS_KEY_LEN];
   size_t nbyte_remain = nbyte;
   size_t block_size;
@@ -203,7 +203,7 @@ horus_write (int fd, void *buf, size_t nbyte)
   while (nbyte_remain > 0)
     {
       block_id = fdpos / block_size;
-      horus_get_leaf_block_key (fd, &horus_block_key, block_id);
+      horus_get_leaf_block_key (fd, horus_block_key, block_id);
       aes_xts_setkey (key_info->cipher, horus_block_key, HORUS_KEY_LEN);
       // Use block_id as IV
       memset (iv, 0, sizeof (iv));
@@ -266,6 +266,15 @@ horus_set_kht (const int fd, int depth, size_t leaf_block_size, const int *branc
   if (NULL == p->branching_factor)
     abort (); // TODO
   memcpy (p->branching_factor, branching_factor, branching_factor_size);
+
+  if (p->block_size)
+    free (p->block_size);
+  p->block_size = malloc (sizeof (p->block_size[0]) * depth);
+  if (NULL == p->block_size)
+    abort (); // TODO
+  p->block_size[depth-1] = leaf_block_size;
+  for (i = depth-2; i>=0; --i)
+    p->block_size[i] = p->block_size[i+1] * p->branching_factor[i];
 }
 
 void *
@@ -319,7 +328,7 @@ horus_add_key (const int fd,
 }
 
 int
-horus_get_leaf_block_key (const int fd, void **out_key, size_t block_id)
+horus_get_leaf_block_key (const int fd, void *out_key, size_t block_id)
 {
   struct _key_store_entry *p = find_key_by_fd (fd);
 
@@ -330,4 +339,23 @@ horus_get_leaf_block_key (const int fd, void **out_key, size_t block_id)
     }
   
   return horus_get_key (fd, out_key, p->depth, block_id);
+}
+
+ssize_t
+horus_get_block_size (const int fd, const int x)
+{
+  struct _key_store_entry *p = find_key_by_fd (fd);
+
+  if (NULL == p)
+    {
+      perror (__func__);
+      return -1;
+    }
+  if (x > p->depth)
+    {
+      fprintf (stderr, "Requesting block size at a level greater than depth\n");
+      return -1;
+    }
+
+  return p->block_size[x-1];
 }

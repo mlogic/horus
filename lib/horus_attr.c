@@ -1,13 +1,26 @@
-/* Copyright Nakul Dhotre UCSC */
+/*
+ * Horus File Attributes Utils
+ *
+ * Copyright (c) 2012, University of California, Santa Cruz, CA, USA.
+ * Developers:
+ *  Nakul Dhotre <nakul@soe.ucsc.edu>
+ *  Yan Li <yanli@ucsc.edu>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as 
+ * published by the Free Software Foundation.
+ */
 
-
+#include <unistd.h>
+#include <sys/xattr.h>
+#include <sys/types.h>
 #include <horus_attr.h>
-
 
 int
 horus_ea_config_init (struct horus_ea_config *config)
 {
   bzero (config, sizeof (struct horus_ea_config));
+  return 0;
 }
 
 int
@@ -38,17 +51,17 @@ horus_ea_config_masterkey (char *path, int in_fd, char *key)
       fd = in_fd;
     }
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
+    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
   if (res == -1)
     {
       horus_ea_config_init (&config);
     }
 
-  strncpy (config.master_key, key, strlen(key));
+  strncpy ((char*)config.master_key, key, strlen(key));
 
-set_attr:
+ set_attr:
   res =
-    fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
+    fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
   if (res == -1)
     return -errno;
   if (in_fd == -1)
@@ -77,10 +90,10 @@ horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
     fd = in_fd;
 
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
+    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
 
-/* Error here most probably means this is a new file and we are setting EA for first time. 
- * TODO: We will have to check for operation not permitted error */
+  /* Error here most probably means this is a new file and we are setting EA for first time. 
+   * TODO: We will have to check for operation not permitted error */
   if (res == -1)
     horus_ea_config_init (&config);
 
@@ -94,9 +107,9 @@ horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
 
 
 
-set_attr:
+ set_attr:
   res =
-    fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
+    fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
   if (res == -1)
     return -errno;
   if (in_fd == -1)
@@ -126,7 +139,7 @@ horus_ea_config_show (char *path)
     lgetxattr (path, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE,
                0);
 
-/* If we just return from here we can create a get_config API function */
+  /* If we just return from here we can create a get_config API function */
   if (res == -1)
     return -errno;
   memcpy (&count, config.entry_count, 4);
@@ -161,7 +174,7 @@ horus_get_fattr_masterkey (int fd, char *buf, int bufsiz)
   struct horus_ea_config config;
 
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
+    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
 
   if (res == -1)
     return -errno;
@@ -213,7 +226,7 @@ horus_get_fattr_client (int fd, struct in_addr *client,
   struct in_addr ip;
 
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
+    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
 
   if (res == -1)
     return -errno;
@@ -244,7 +257,7 @@ horus_get_fattr(int fd, struct horus_ea_config *config)
   int res;
 
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) config, HORUS_EA_SIZE, 0);
+    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) config, HORUS_EA_SIZE, 0, 0);
 
   if (res == -1)
     return -errno;
