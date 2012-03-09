@@ -1,3 +1,4 @@
 check_aes
 check_api
 check_horus_key
+benchmark_key_utils

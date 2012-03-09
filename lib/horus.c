@@ -268,6 +268,17 @@ horus_set_kht (const int fd, int depth, size_t leaf_block_size, const int *branc
   memcpy (p->branching_factor, branching_factor, branching_factor_size);
 }
 
+void *
+duplicate_key (const void *key, size_t key_len)
+{
+  void *key_to_add = malloc (HORUS_KEY_LEN);
+  if (NULL == key_to_add)
+    abort ();
+  memset (key_to_add, 0, HORUS_KEY_LEN);
+  memcpy (key_to_add, key, key_len > HORUS_KEY_LEN ? HORUS_KEY_LEN : key_len);
+  return key_to_add;
+}
+
 int
 horus_add_key (const int fd,
 	       const void *key, size_t key_len,
@@ -283,7 +294,11 @@ horus_add_key (const int fd,
       perror (__func__);
       abort ();
     }
-
+  if (0 == x && 0 == y)  /* master key? */
+    {
+      p->master_key = duplicate_key (key, key_len);
+      return 0;
+    }
   if (x > p->depth)
     {
       perror ("Trying to set key at a level deeper than the depth of KHT.");
@@ -297,11 +312,7 @@ horus_add_key (const int fd,
 	free (old_key);
     }
 
-  key_to_add = malloc (HORUS_KEY_LEN);
-  if (NULL == key_to_add)
-    abort ();
-  memset (key_to_add, 0, HORUS_KEY_LEN);
-  memcpy (key_to_add, key, key_len > HORUS_KEY_LEN ? HORUS_KEY_LEN : key_len);
+  key_to_add = duplicate_key (key, key_len);
   vectorx_set (key_vec_x, y, key_to_add);
 
   return 0;
