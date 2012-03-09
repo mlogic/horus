@@ -1,18 +1,49 @@
 #include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <rpc/rpc.h>
 #include "kds_rpc.h"
+#include "benchmark.h"
 
 int
 main (int argc, char *argv[])
 {
   CLIENT *cl;
   char *filename, *server;
-  int xy[MAXKEYS][2],num_keys = 0,i,j;
+  int xy[MAXKEYS][2],num_keys = 0,i,j,ret;
   struct key_request req;
   struct key_rtn *resp;
   
+  struct timeval timeout = { 25, 0 };
+  if (argc == 2)
+  {
+    server = argv[1];
+#ifdef HIRES_TIME
 
-  if (argc < 5)
+    start_clock_hires();
+#endif
+    cl = clnt_create (server, KDS_RPC, KEYREQVERS, "udp");
+    if (cl == NULL)
+    {
+      clnt_pcreateerror (server);
+      exit (1);
+    }
+    ret = clnt_call(cl, NULLPROC, xdr_void, (caddr_t) NULL, xdr_void,
+              (caddr_t) NULL, timeout);
+    if (ret == RPC_SUCCESS)
+    {
+#ifdef HIRES_TIME
+      end_clock_hires("kds_client_nullrpc: ");
+#endif
+    }
+    else
+    {
+      clnt_perror(cl, "rpc");
+    }
+    exit (0);
+  }
+      
+ if (argc < 5)
     {
       fprintf (stderr, "usage %s server filename x y [x y ...]\n", argv[0]);
       exit (1);
@@ -37,6 +68,9 @@ main (int argc, char *argv[])
   }
   server = argv[1];
   filename = argv[2];
+#ifdef HIRES_TIME
+  start_clock_hires();
+#endif
   cl = clnt_create (server, KDS_RPC, KEYREQVERS, "udp");
   if (cl == NULL)
     {
@@ -58,6 +92,9 @@ main (int argc, char *argv[])
       clnt_perror (cl, "call failed:");
       exit(1);
     }
+#ifdef HIRES_TIME
+  end_clock_hires("kds_rpc_client_keyreq: ");
+#endif
   clnt_destroy (cl);
   if (resp->err == 0)
   {

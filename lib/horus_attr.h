@@ -100,4 +100,11 @@ horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
 int
 horus_ea_config_masterkey (char *path, int in_fd, char *key);
 
+int
+horus_get_fattr(int fd, struct horus_ea_config *config);
+
+int horus_get_fattr_config_client (struct horus_ea_config *config, struct in_addr *client, u_int32_t *start, u_int32_t *end);
+
+int horus_get_fattr_masterkey_config (struct horus_ea_config *config,
+                                      char *buf, int bufsiz);
 #endif

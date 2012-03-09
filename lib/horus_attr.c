@@ -179,6 +179,22 @@ horus_get_fattr_masterkey (int fd, char *buf, int bufsiz)
 }
 
 
+int horus_get_fattr_masterkey_config (struct horus_ea_config *config,
+                                      char *buf, int bufsiz)
+{
+  int len;
+  len = strlen (config->master_key);
+  if (len + 1 > bufsiz)
+    return -ENOSPC;
+
+  if (len > 0)
+    memcpy (buf, config->master_key, len + 1);
+  else
+    *buf = '\0';
+
+  return (strlen (config->master_key));
+}
+
 int
 horus_set_fattr_client (int fd, struct in_addr *client,
                         u_int32_t start, u_int32_t end)
@@ -220,3 +236,47 @@ horus_get_fattr_client (int fd, struct in_addr *client,
   else
     return -1;
 }
+
+int
+horus_get_fattr(int fd, struct horus_ea_config *config)
+{
+
+  int res;
+
+  res =
+    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) config, HORUS_EA_SIZE, 0);
+
+  if (res == -1)
+    return -errno;
+  else
+    return 0;
+}
+
+
+
+int horus_get_fattr_config_client (struct horus_ea_config *config, struct in_addr *client, u_int32_t *start, u_int32_t *end)
+{
+
+  int res, len, i, count, found = 0;
+  struct in_addr ip;
+
+
+  memcpy (&count, config->entry_count, 4);
+  for (i = 0; i < count; i++)
+    {
+
+      memcpy (&ip.s_addr, config->entry_table[i].addr, 4);
+      if (ip.s_addr == client->s_addr)
+        {
+          memcpy (start, config->entry_table[i].start_block_num, 4);
+          memcpy (end, config->entry_table[i].end_block_num, 4);
+          found = 1;
+          break;
+        }
+    }
+  if (found)
+    return 0;
+  else
+    return -1;
+}
+
