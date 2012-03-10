@@ -47,6 +47,13 @@ else
    CFLAGS="$CFLAGS -O2"
 fi
 
+AC_CANONICAL_HOST
+case $host in
+    *-apple-*) apple=true   ;;
+    *-linux-*) apple=false   ;;
+esac
+AM_CONDITIONAL([APPLE], [test x$apple = xtrue])
+
 AC_ARG_ENABLE([aseni],
      [  --enable-intel-aesni    Turn on Intel AESNI],
      [case "${enableval}" in
@@ -62,7 +69,7 @@ AC_ARG_ENABLE([fuse],
        yes) fuse=true ;;
        no)  fuse=false ;;
         *) AC_MSG_ERROR([bad value ${enableval} for --enable-fuse]) ;;
-     esac],[fuse=true])
+     esac],[fuse=false])
 AM_CONDITIONAL([FUSE], [test x$fuse = xtrue])
 
 

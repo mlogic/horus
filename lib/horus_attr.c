@@ -23,6 +23,40 @@ horus_ea_config_init (struct horus_ea_config *config)
   return 0;
 }
 
+inline ssize_t
+_fgetxattr (int fd, const char *name,
+	    void *value, size_t size)
+{
+#ifdef __APPLE__
+  return fgetxattr (fd, name, value, size, 0, 0);
+#else /* For Linux */
+  return fgetxattr (fd, name, value, size);
+#endif
+}
+
+inline ssize_t
+_fsetxattr (int fd, const char *name,
+	    void *value, size_t size, int flags)
+{
+#ifdef __APPLE__
+  return fsetxattr (fd, name, value, size, flags, 0);
+#else /* For Linux */
+  return fsetxattr (fd, name, value, size, flags);
+#endif
+}
+
+inline ssize_t
+_lgetxattr(const char *path, const char *name,
+	   void *value, size_t size)
+{
+#ifdef __APPLE__
+  return lgetxattr (path, name, value, size, 0);
+#else /* For Linux */
+  return lgetxattr (path, name, value, size);
+#endif
+}
+
+
 int
 horus_ea_config_masterkey (char *path, int in_fd, char *key)
 {
@@ -51,7 +85,7 @@ horus_ea_config_masterkey (char *path, int in_fd, char *key)
       fd = in_fd;
     }
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
+    _fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE);
   if (res == -1)
     {
       horus_ea_config_init (&config);
@@ -61,7 +95,7 @@ horus_ea_config_masterkey (char *path, int in_fd, char *key)
 
  set_attr:
   res =
-    fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
+    _fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
   if (res == -1)
     return -errno;
   if (in_fd == -1)
@@ -90,7 +124,7 @@ horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
     fd = in_fd;
 
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
+    _fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE);
 
   /* Error here most probably means this is a new file and we are setting EA for first time. 
    * TODO: We will have to check for operation not permitted error */
@@ -109,7 +143,7 @@ horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
 
  set_attr:
   res =
-    fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
+    _fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
   if (res == -1)
     return -errno;
   if (in_fd == -1)
@@ -136,8 +170,7 @@ horus_ea_config_show (char *path)
     return -errno;
 
   res =
-    lgetxattr (path, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE,
-               0);
+    _lgetxattr (path, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE);
 
   /* If we just return from here we can create a get_config API function */
   if (res == -1)
@@ -174,12 +207,12 @@ horus_get_fattr_masterkey (int fd, char *buf, int bufsiz)
   struct horus_ea_config config;
 
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
+    _fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE);
 
   if (res == -1)
     return -errno;
 
-  len = strlen (config.master_key);
+  len = strlen ((char*)config.master_key);
   if (len + 1 > bufsiz)
     return -ENOSPC;
 
@@ -221,12 +254,12 @@ int
 horus_get_fattr_client (int fd, struct in_addr *client,
                         u_int32_t * start, u_int32_t * end)
 {
-  int res, len, i, count, found = 0;
+  int res, i, count, found = 0;
   struct horus_ea_config config;
   struct in_addr ip;
 
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0, 0);
+    _fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE);
 
   if (res == -1)
     return -errno;
@@ -257,7 +290,7 @@ horus_get_fattr(int fd, struct horus_ea_config *config)
   int res;
 
   res =
-    fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) config, HORUS_EA_SIZE, 0, 0);
+    _fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) config, HORUS_EA_SIZE);
 
   if (res == -1)
     return -errno;
@@ -270,7 +303,7 @@ horus_get_fattr(int fd, struct horus_ea_config *config)
 int horus_get_fattr_config_client (struct horus_ea_config *config, struct in_addr *client, u_int32_t *start, u_int32_t *end)
 {
 
-  int res, len, i, count, found = 0;
+  int i, count, found = 0;
   struct in_addr ip;
 
 

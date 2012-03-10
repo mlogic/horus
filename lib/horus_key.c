@@ -105,6 +105,7 @@ block_key (char *key, size_t *key_len,
 {
   void *message;
   int size;
+  unsigned int out_key_len;
 
 #ifdef NON_STRING_MESSAGE
   u_int32_t x__y = ((x << 24) | y);
@@ -129,9 +130,12 @@ block_key (char *key, size_t *key_len,
           (const void *)message, size, key);
   *key_len = SHA_DIGEST_LENGTH;
 #else /*__APPLE__*/
+  /* HMAC outputs a uint to out_key_len, need to convert it to size_t
+     for key_len */
   HMAC (EVP_sha1(), parent, parent_len,
         (const unsigned char *) message, size,
-        (unsigned char *) key, key_len);
+        (unsigned char *) key, &out_key_len);
+  *key_len = (size_t)out_key_len;
 #endif /*__APPLE__*/
 
   if (debug)
@@ -215,7 +219,7 @@ horus_get_key (const int fd, void *out_key, const int x, const int y)
   if (0 != horus_get_key (fd, parent_key, parent_x, parent_y))
       return -1;
 
-  block_key (out_key, &key_len, parent_key, HORUS_KEY_LEN, x, y);
+  block_key (out_key, &key_len, (char*)parent_key, HORUS_KEY_LEN, x, y);
   vectorx_set (key_vec_x, y, duplicate_key (out_key, HORUS_KEY_LEN));
   
   return 0;

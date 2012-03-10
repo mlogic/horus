@@ -25,3 +25,8 @@ check_horus_key_LDADD = @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ $(top_builddir)/lib/lib
 benchmark_key_utils_SOURCES = benchmark_key_utils.c
 benchmark_key_utils_CFLAGS = @OPENSSL_INCLUDES@
 benchmark_key_utils_LDADD = @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ $(top_builddir)/lib/libhorus.la
+if APPLE
+benchmark_key_utils_LDFLAGS = -framework CoreServices
+else
+benchmark_key_utils_LDADD += -lrt
+endif

@@ -26,7 +26,7 @@
 int debug = 0;
 const char *master_key = "Horus Rocks!";
 
-void benchmark_write_2gb (const int kht_depth,
+void henchmark_key_calc_2gb (const int kht_depth,
 			  const int branching_factor)
 {
   int i;
@@ -73,8 +73,9 @@ void benchmark_write_2gb (const int kht_depth,
 	printf ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
     }
 
-  printf ("Calculate,%d,%d,", kht_depth, branching_factor);
-  end_clock ("");
+  printf ("key_calc_2gb_first_round,%d,%d,", kht_depth, branching_factor);
+  end_clock ();
+  printf ("\n");
 
   start_clock ();
   // run it again
@@ -89,8 +90,9 @@ void benchmark_write_2gb (const int kht_depth,
       if (debug)
 	printf ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
     }
-  printf ("Retrieve,%d,%d,", kht_depth, branching_factor);
-  end_clock ("");
+  printf ("key_calc_2gb_second_round,%d,%d,", kht_depth, branching_factor);
+  end_clock ();
+  printf ("\n");
 }
 
 int
@@ -99,26 +101,25 @@ main (int argc, char **argv)
   if ( (argc >= 2) && strcmp (argv[1], "-d") == 0 )
     debug = 1;
 
-  printf ("ticks per second: %ld\n", tick_per_second ());
-  printf ("Round,kht_depth,branching_factor,real_time,user_time,system_time\n");
+  printf ("round,kht_depth,branching_factor,time_sec,time_nanosec\n");
 
-  benchmark_write_2gb (2, 2);
-  benchmark_write_2gb (3, 2);
-  benchmark_write_2gb (4, 2);
-  benchmark_write_2gb (5, 2);
-  benchmark_write_2gb (6, 2);
-  benchmark_write_2gb (7, 2);
-  benchmark_write_2gb (8, 2);
-  benchmark_write_2gb (9, 2);
-  benchmark_write_2gb (10, 2);
-  benchmark_write_2gb (4, 3);
-  benchmark_write_2gb (4, 4);
-  benchmark_write_2gb (4, 5);
-  benchmark_write_2gb (4, 6);
-  benchmark_write_2gb (4, 7);
-  benchmark_write_2gb (4, 8);
-  benchmark_write_2gb (4, 9);
-  benchmark_write_2gb (4, 10);
-  benchmark_write_2gb (4, 11);
+  henchmark_key_calc_2gb (2, 2);
+  henchmark_key_calc_2gb (3, 2);
+  henchmark_key_calc_2gb (4, 2);
+  henchmark_key_calc_2gb (5, 2);
+  henchmark_key_calc_2gb (6, 2);
+  henchmark_key_calc_2gb (7, 2);
+  henchmark_key_calc_2gb (8, 2);
+  henchmark_key_calc_2gb (9, 2);
+  henchmark_key_calc_2gb (10, 2);
+  henchmark_key_calc_2gb (4, 3);
+  henchmark_key_calc_2gb (4, 4);
+  henchmark_key_calc_2gb (4, 5);
+  henchmark_key_calc_2gb (4, 6);
+  henchmark_key_calc_2gb (4, 7);
+  henchmark_key_calc_2gb (4, 8);
+  henchmark_key_calc_2gb (4, 9);
+  henchmark_key_calc_2gb (4, 10);
+  henchmark_key_calc_2gb (4, 11);
   return 0;
 }

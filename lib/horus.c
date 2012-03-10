@@ -12,7 +12,6 @@
  */
 
 #include "horus_key.h"
-#include "horus_crypt.h"
 #include "horus.h"
 #include "log.h"
 

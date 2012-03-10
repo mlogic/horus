@@ -35,7 +35,6 @@
 #endif
 
 #include <horus_attr.h>
-#include <horus_crypt.h>
 #include <horus_key.h>
 #include <horusfs.h>
 #include <rpc/rpc.h>

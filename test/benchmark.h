@@ -1,65 +1,52 @@
+/*
+ * Horus Benchmark Utils
+ *
+ * Copyright (c) 2012, University of California, Santa Cruz, CA, USA.
+ * Developers:
+ *  Nakul Dhotre <nakul@soe.ucsc.edu>
+ *  Yan Li <yanli@ucsc.edu>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as 
+ * published by the Free Software Foundation.
+ *
+ * For Mac OS X, we use Mach Absolute Time Units as documented at:
+ * https://developer.apple.com/library/mac/#qa/qa1398/_index.html
+ *
+ * For Linux, we use clock_gettime()'s CLOCK_MONOTONIC.
+ */
+
 #ifndef _HORUS_BENCHMARK_H
 #define _HORUS_BENCHMARK_H
 
-#include <sys/times.h>
-#include <stdio.h>
-
-#include <time.h>
-
-void start_clock(void);
-void end_clock(char *msg);
-
-static clock_t st_time;
-static clock_t en_time;
-static struct tms st_cpu;
-static struct tms en_cpu;
-
-
-inline long
-tick_per_second ()
-{
-  return sysconf(_SC_CLK_TCK);
-}
+#ifdef __APPLE__
+#  include <CoreServices/CoreServices.h>
+#  include <mach/mach.h>
+#  include <mach/mach_time.h>
+#  include <unistd.h>
+   uint64_t        start;
+   uint64_t        end;
+   uint64_t        elapsed;
+   Nanoseconds     elapsedNano;
+#else /* For Linux code follows */
+#  include <sys/times.h>
+#  include <stdio.h>
+#  include <time.h>
+   static struct timespec st_hires_time, en_hires_time;
+#endif /* __APPLE__ */
 
 void
 start_clock ()
 {
-  st_time = times(&st_cpu);
+#ifdef __APPLE__
+  start = mach_absolute_time ();
+#else /* __APPLE__ */
+  clock_gettime (CLOCK_MONOTONIC, &st_hires_time);
+#endif /* __APPLE__ */
 }
 
-intmax_t
-get_real_time ()
-{
-  return (intmax_t)(en_time - st_time);
-}
-
-
-/* This example assumes that the result of each subtraction
-   is within the range of values that can be represented in
-   an integer type. */
-void
-end_clock(char *msg)
-{
-  en_time = times(&en_cpu);
-
-  fputs (msg, stdout);
-  printf ("%jd,%jd,%jd\n",
-	  (intmax_t)get_real_time (),
-	  (intmax_t)(en_cpu.tms_utime - st_cpu.tms_utime),
-	  (intmax_t)(en_cpu.tms_stime - st_cpu.tms_stime)
-	  );
-}
-
-#ifdef HIRES_TIME
-
-static struct timespec st_hires_time, en_hires_time;
-
-void start_clock_hires ()
-{
-  clock_gettime(CLOCK_MONOTONIC, &st_hires_time);
-}
-
-struct timespec diff(struct timespec start, struct timespec end)
+struct timespec
+diff (struct timespec start, struct timespec end)
 {
   struct timespec temp;
   if ((end.tv_nsec-start.tv_nsec)<0) {
@@ -72,17 +59,25 @@ struct timespec diff(struct timespec start, struct timespec end)
   return temp;
 }
 
-void end_clock_hires(char *msg)
+void
+end_clock (void)
 {
+  long sec, nanosec;
+#ifdef __APPLE__
+  end = mach_absolute_time ();
+  elapsed = end - start;
+  elapsedNano = AbsoluteToNanoseconds( *(AbsoluteTime *) &elapsed );
+  nanosec = * (uint64_t *) &elapsedNano;
+  sec = nanosec / 1000000000;
+  nanosec = nanosec % 1000000000;
+#else /* __APPLE__ */
   struct timespec result;
-  clock_gettime(CLOCK_MONOTONIC, &en_hires_time);
-  fputs (msg, stdout);
-  result = diff(st_hires_time,en_hires_time);
-  printf ("%d %ld\n",result.tv_sec,
-          result.tv_nsec);
+  clock_gettime (CLOCK_MONOTONIC, &en_hires_time);
+  result = diff (st_hires_time, en_hires_time);
+  sec = result.tv_sec;
+  nanosec = result.tv_nsec;
+#endif /* __APPLE__ */
+  printf ("%ld,%ld", sec, nanosec);
 }
 
-
-
-#endif
-#endif
+#endif /* _HORUS_BENCHMARK_H */

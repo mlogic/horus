@@ -38,8 +38,6 @@ void key_to_string (char *buf, int size, char *key, int key_len);
 char *print_key (char *key, int key_len);
 char *block_key (char *key, size_t *key_len,
 		 char *parent, int parent_len, int x, int y);
-void horus_key (char *key, size_t *key_len, int filepos,
-		char *ktype, char *kvalue);
 void *duplicate_key (const void *key, size_t key_len);
 
 struct _key_store_entry* find_key_by_fd (const int fd);
