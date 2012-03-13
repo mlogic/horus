@@ -23,5 +23,8 @@ void log_dup2 (int fd, int fd2);
 void log_mesg (int priority, char *message, ...);
 void log_error (char *message, ...);
 
+#define debug_print(fmt, ...) \
+            do { if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
+
 #endif /*_LOG_H_*/
 

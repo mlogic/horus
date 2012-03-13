@@ -14,16 +14,18 @@
  * 1: set a master key, write a 2 GB file in 4KB block
  *
  */
+#define DEBUG 0
 
 #include <check.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include "horus.h"
+#include "log.h"
 #include "horus_key.h"
 #include "benchmark.h"
 
-int debug = 0;
+
 const char *master_key = "Horus Rocks!";
 
 void benchmark_key_calc_2gb (const int kht_depth,
@@ -64,17 +66,17 @@ void benchmark_key_calc_2gb (const int kht_depth,
   for (s = 0; s < test_file_size / 4096; ++s)
     {
       horus_get_leaf_block_key (fake_fd, &block_key, s);
-      if (NULL == block_key)
+      if (unlikely (NULL == block_key))
 	{
 	  printf ("Error getting block key for block %zu\n", s);
 	  abort ();
 	}
-      if (debug)
-	printf ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
+      debug_print ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
     }
 
-  printf ("key_calc_2gb_first_round,%d,%d,", kht_depth, branching_factor);
   end_clock ();
+  printf ("key_calc_2gb_first_round,%d,%d,", kht_depth, branching_factor);
+  print_last_clock_diff ();
   printf ("\n");
 
   start_clock ();
@@ -82,16 +84,16 @@ void benchmark_key_calc_2gb (const int kht_depth,
   for (s = 0; s < test_file_size / 4096; ++s)
     {
       horus_get_leaf_block_key (fake_fd, &block_key, s);
-      if (NULL == block_key)
+      if (unlikely (NULL == block_key))
 	{
 	  printf ("Error getting block key for block %zu\n", s);
 	  abort ();
 	}
-      if (debug)
-	printf ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
+      debug_print ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
     }
-  printf ("key_calc_2gb_second_round,%d,%d,", kht_depth, branching_factor);
   end_clock ();
+  printf ("key_calc_2gb_second_round,%d,%d,", kht_depth, branching_factor);
+  print_last_clock_diff ();
   printf ("\n");
 }
 
