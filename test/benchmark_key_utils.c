@@ -26,7 +26,7 @@
 int debug = 0;
 const char *master_key = "Horus Rocks!";
 
-void henchmark_key_calc_2gb (const int kht_depth,
+void benchmark_key_calc_2gb (const int kht_depth,
 			  const int branching_factor)
 {
   int i;
@@ -103,23 +103,23 @@ main (int argc, char **argv)
 
   printf ("round,kht_depth,branching_factor,time_sec,time_nanosec\n");
 
-  henchmark_key_calc_2gb (2, 2);
-  henchmark_key_calc_2gb (3, 2);
-  henchmark_key_calc_2gb (4, 2);
-  henchmark_key_calc_2gb (5, 2);
-  henchmark_key_calc_2gb (6, 2);
-  henchmark_key_calc_2gb (7, 2);
-  henchmark_key_calc_2gb (8, 2);
-  henchmark_key_calc_2gb (9, 2);
-  henchmark_key_calc_2gb (10, 2);
-  henchmark_key_calc_2gb (4, 3);
-  henchmark_key_calc_2gb (4, 4);
-  henchmark_key_calc_2gb (4, 5);
-  henchmark_key_calc_2gb (4, 6);
-  henchmark_key_calc_2gb (4, 7);
-  henchmark_key_calc_2gb (4, 8);
-  henchmark_key_calc_2gb (4, 9);
-  henchmark_key_calc_2gb (4, 10);
-  henchmark_key_calc_2gb (4, 11);
+  benchmark_key_calc_2gb (2, 2);
+  benchmark_key_calc_2gb (3, 2);
+  benchmark_key_calc_2gb (4, 2);
+  benchmark_key_calc_2gb (5, 2);
+  benchmark_key_calc_2gb (6, 2);
+  benchmark_key_calc_2gb (7, 2);
+  benchmark_key_calc_2gb (8, 2);
+  benchmark_key_calc_2gb (9, 2);
+  benchmark_key_calc_2gb (10, 2);
+  benchmark_key_calc_2gb (4, 3);
+  benchmark_key_calc_2gb (4, 4);
+  benchmark_key_calc_2gb (4, 5);
+  benchmark_key_calc_2gb (4, 6);
+  benchmark_key_calc_2gb (4, 7);
+  benchmark_key_calc_2gb (4, 8);
+  benchmark_key_calc_2gb (4, 9);
+  benchmark_key_calc_2gb (4, 10);
+  benchmark_key_calc_2gb (4, 11);
   return 0;
 }
