@@ -14,19 +14,21 @@
  * 1: set a master key, write a 2 GB file in 4KB block
  *
  */
+#define DEBUG 0
 
 #include <check.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include "horus.h"
+#include "log.h"
 #include "horus_key.h"
 #include "benchmark.h"
 
-int debug = 0;
+
 const char *master_key = "Horus Rocks!";
 
-void henchmark_key_calc_2gb (const int kht_depth,
+void benchmark_key_calc_2gb (const int kht_depth,
 			  const int branching_factor)
 {
   int i;
@@ -64,17 +66,17 @@ void henchmark_key_calc_2gb (const int kht_depth,
   for (s = 0; s < test_file_size / 4096; ++s)
     {
       horus_get_leaf_block_key (fake_fd, &block_key, s);
-      if (NULL == block_key)
+      if (unlikely (NULL == block_key))
 	{
 	  printf ("Error getting block key for block %zu\n", s);
 	  abort ();
 	}
-      if (debug)
-	printf ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
+      debug_print ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
     }
 
-  printf ("key_calc_2gb_first_round,%d,%d,", kht_depth, branching_factor);
   end_clock ();
+  printf ("key_calc_2gb_first_round,%d,%d,", kht_depth, branching_factor);
+  print_last_clock_diff ();
   printf ("\n");
 
   start_clock ();
@@ -82,16 +84,16 @@ void henchmark_key_calc_2gb (const int kht_depth,
   for (s = 0; s < test_file_size / 4096; ++s)
     {
       horus_get_leaf_block_key (fake_fd, &block_key, s);
-      if (NULL == block_key)
+      if (unlikely (NULL == block_key))
 	{
 	  printf ("Error getting block key for block %zu\n", s);
 	  abort ();
 	}
-      if (debug)
-	printf ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
+      debug_print ("block %04d key = %s\n", i, print_key (block_key, HORUS_KEY_LEN));
     }
-  printf ("key_calc_2gb_second_round,%d,%d,", kht_depth, branching_factor);
   end_clock ();
+  printf ("key_calc_2gb_second_round,%d,%d,", kht_depth, branching_factor);
+  print_last_clock_diff ();
   printf ("\n");
 }
 
@@ -103,23 +105,23 @@ main (int argc, char **argv)
 
   printf ("round,kht_depth,branching_factor,time_sec,time_nanosec\n");
 
-  henchmark_key_calc_2gb (2, 2);
-  henchmark_key_calc_2gb (3, 2);
-  henchmark_key_calc_2gb (4, 2);
-  henchmark_key_calc_2gb (5, 2);
-  henchmark_key_calc_2gb (6, 2);
-  henchmark_key_calc_2gb (7, 2);
-  henchmark_key_calc_2gb (8, 2);
-  henchmark_key_calc_2gb (9, 2);
-  henchmark_key_calc_2gb (10, 2);
-  henchmark_key_calc_2gb (4, 3);
-  henchmark_key_calc_2gb (4, 4);
-  henchmark_key_calc_2gb (4, 5);
-  henchmark_key_calc_2gb (4, 6);
-  henchmark_key_calc_2gb (4, 7);
-  henchmark_key_calc_2gb (4, 8);
-  henchmark_key_calc_2gb (4, 9);
-  henchmark_key_calc_2gb (4, 10);
-  henchmark_key_calc_2gb (4, 11);
+  benchmark_key_calc_2gb (2, 2);
+  benchmark_key_calc_2gb (3, 2);
+  benchmark_key_calc_2gb (4, 2);
+  benchmark_key_calc_2gb (5, 2);
+  benchmark_key_calc_2gb (6, 2);
+  benchmark_key_calc_2gb (7, 2);
+  benchmark_key_calc_2gb (8, 2);
+  benchmark_key_calc_2gb (9, 2);
+  benchmark_key_calc_2gb (10, 2);
+  benchmark_key_calc_2gb (4, 3);
+  benchmark_key_calc_2gb (4, 4);
+  benchmark_key_calc_2gb (4, 5);
+  benchmark_key_calc_2gb (4, 6);
+  benchmark_key_calc_2gb (4, 7);
+  benchmark_key_calc_2gb (4, 8);
+  benchmark_key_calc_2gb (4, 9);
+  benchmark_key_calc_2gb (4, 10);
+  benchmark_key_calc_2gb (4, 11);
   return 0;
 }

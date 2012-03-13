@@ -35,7 +35,7 @@
    static struct timespec st_hires_time, en_hires_time;
 #endif /* __APPLE__ */
 
-void
+inline void
 start_clock ()
 {
 #ifdef __APPLE__
@@ -45,7 +45,7 @@ start_clock ()
 #endif /* __APPLE__ */
 }
 
-struct timespec
+inline static struct timespec
 diff (struct timespec start, struct timespec end)
 {
   struct timespec temp;
@@ -59,12 +59,22 @@ diff (struct timespec start, struct timespec end)
   return temp;
 }
 
-void
+/* end_clock must be quick, and doesn't affect the timing much */
+inline void
 end_clock (void)
+{
+#ifdef __APPLE__
+  end = mach_absolute_time ();
+#else /* __APPLE__ */
+  clock_gettime (CLOCK_MONOTONIC, &en_hires_time);
+#endif /* __APPLE__ */
+}
+
+void
+print_last_clock_diff (void)
 {
   long sec, nanosec;
 #ifdef __APPLE__
-  end = mach_absolute_time ();
   elapsed = end - start;
   elapsedNano = AbsoluteToNanoseconds( *(AbsoluteTime *) &elapsed );
   nanosec = * (uint64_t *) &elapsedNano;
@@ -72,7 +82,6 @@ end_clock (void)
   nanosec = nanosec % 1000000000;
 #else /* __APPLE__ */
   struct timespec result;
-  clock_gettime (CLOCK_MONOTONIC, &en_hires_time);
   result = diff (st_hires_time, en_hires_time);
   sec = result.tv_sec;
   nanosec = result.tv_nsec;
