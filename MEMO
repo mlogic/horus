@@ -1,0 +1,4 @@
+
+- Do not use bcopy(). use memset ('0') for portability.
+
+
