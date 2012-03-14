@@ -32,7 +32,7 @@
 #  include <sys/times.h>
 #  include <stdio.h>
 #  include <time.h>
-   static struct timespec st_hires_time, en_hires_time;
+   struct timespec st_hires_time, en_hires_time;
 #endif /* __APPLE__ */
 
 inline void

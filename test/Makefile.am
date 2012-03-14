@@ -2,7 +2,8 @@ TESTS = check_aes check_horus_key check_api
 AM_CPPFLAGS = -I$(top_srcdir)/lib -I$(top_srcdir)/aes
 AM_LDFLAGS = -L$(top_srcdir)/lib
 
-check_PROGRAMS = check_aes check_horus_key check_api benchmark_key_utils
+check_PROGRAMS = check_aes check_horus_key check_api benchmark_key_utils \
+    benchmark_read_write
 check_aes_SOURCES = check_aes.c \
     $(top_srcdir)/aes/gf128mul.c $(top_srcdir)/aes/xts.c
 if INTEL_AESNI
@@ -29,4 +30,13 @@ if APPLE
 benchmark_key_utils_LDFLAGS = -framework CoreServices
 else
 benchmark_key_utils_LDADD += -lrt
+endif
+
+benchmark_read_write_SOURCES = benchmark_read_write.c
+benchmark_read_write_CFLAGS = @OPENSSL_INCLUDES@
+benchmark_read_write_LDADD = @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ $(top_builddir)/lib/libhorus.la
+if APPLE
+benchmark_read_write_LDFLAGS = -framework CoreServices
+else
+benchmark_read_write_LDADD += -lrt
 endif
