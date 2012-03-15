@@ -19,6 +19,10 @@ test_pthread_LDADD = @PTHREAD_LIBS@
 test_openssl_SOURCES = test_openssl.c
 test_openssl_LDADD = ../lib/libhorus.la @OPENSSL_LIBS@
 
+bin_PROGRAMS = horus-file
+horus_file_SOURCES = horus_file.c
+horus_file_LDADD = ../lib/libhorus.la
+
 sbin_PROGRAMS = horus-kds
 horus_kds_SOURCES = horus_kds.c
 # horus_kds_CFLAGS = @PTHREAD_CFLAGS@

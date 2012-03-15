@@ -6,6 +6,7 @@ test-openssl
 
 horus-key
 horus-kds
+horus-file
 
 kds_rpc_server
 kds_rpc_client

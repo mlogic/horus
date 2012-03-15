@@ -13,6 +13,25 @@
 #include <err.h>
 #include <stdint.h>
 
+#define HORUS_FATTR_NAME "user.horus.config.new"
+#define HORUS_MAX_MASTERKEY_LEN 32
+#define HORUS_MAX_KHT_DEPTH 16
+#define HORUS_MAX_CLIENT_ENTRY 128
+
+struct horus_client_range
+{
+  struct in_addr ipaddr;
+  unsigned int start;
+  unsigned int end;
+};
+
+struct horus_file_config
+{
+  char master_key[HORUS_MAX_MASTERKEY_LEN];
+  unsigned int kht_block_size[HORUS_MAX_KHT_DEPTH];
+  struct horus_client_range client_range[HORUS_MAX_CLIENT_ENTRY];
+};
+
 
 #define HORUS_EA_NAME "user.horus.config"
 #define HORUS_EA_SIZE 1240

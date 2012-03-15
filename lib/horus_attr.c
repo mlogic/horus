@@ -5,6 +5,7 @@
  * Developers:
  *  Nakul Dhotre <nakul@soe.ucsc.edu>
  *  Yan Li <yanli@ucsc.edu>
+ *  Yasuhiro Ohara <yasu@soe.ucsc.edu>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as 
@@ -14,14 +15,8 @@
 #include <unistd.h>
 #include <sys/xattr.h>
 #include <sys/types.h>
+#include <log.h>
 #include <horus_attr.h>
-
-int
-horus_ea_config_init (struct horus_ea_config *config)
-{
-  bzero (config, sizeof (struct horus_ea_config));
-  return 0;
-}
 
 inline ssize_t
 _fgetxattr (int fd, const char *name,
@@ -39,7 +34,7 @@ _fsetxattr (int fd, const char *name,
 	    void *value, size_t size, int flags)
 {
 #ifdef __APPLE__
-  return fsetxattr (fd, name, value, size, flags, 0);
+  return fsetxattr (fd, name, value, size, 0, 0);
 #else /* For Linux */
   return fsetxattr (fd, name, value, size, flags);
 #endif
@@ -50,10 +45,19 @@ _lgetxattr(const char *path, const char *name,
 	   void *value, size_t size)
 {
 #ifdef __APPLE__
-  return lgetxattr (path, name, value, size, 0);
+  return getxattr (path, name, value, size, 0, XATTR_NOFOLLOW);
 #else /* For Linux */
   return lgetxattr (path, name, value, size);
 #endif
+}
+
+/* OLD CODE */
+
+int
+horus_ea_config_init (struct horus_ea_config *config)
+{
+  bzero (config, sizeof (struct horus_ea_config));
+  return 0;
 }
 
 
@@ -93,7 +97,7 @@ horus_ea_config_masterkey (char *path, int in_fd, char *key)
 
   strncpy ((char*)config.master_key, key, strlen(key));
 
- set_attr:
+ //set_attr:
   res =
     _fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
   if (res == -1)
@@ -141,7 +145,7 @@ horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
 
 
 
- set_attr:
+ //set_attr:
   res =
     _fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
   if (res == -1)
@@ -325,4 +329,51 @@ int horus_get_fattr_config_client (struct horus_ea_config *config, struct in_add
   else
     return -1;
 }
+
+/* NEW CODE */
+int
+horus_get_file_config (int fd, struct horus_file_config *config)
+{
+  int ret;
+  ret = _fgetxattr (fd, HORUS_FATTR_NAME, (void *) config,
+                    sizeof (struct horus_file_config));
+  if (ret < 0)
+    log_error ("fgetxattr() failed in %s: %s",
+               __FUNCTION__, strerror (errno));
+  return ret;
+}
+
+int
+horus_set_file_config (int fd, struct horus_file_config *config)
+{
+  int ret;
+  ret = _fsetxattr (fd, HORUS_FATTR_NAME, (void *) config,
+                    sizeof (struct horus_file_config), 0);
+  if (ret < 0)
+    log_error ("fsetxattr() failed in %s: %s",
+               __FUNCTION__, strerror (errno));
+  return ret;
+}
+
+int
+horus_get_master_key (int fd, char *buf, int bufsize)
+{
+  int ret;
+  struct horus_file_config c;
+  horus_get_file_config (fd, &c);
+  ret = snprintf (buf, bufsize, "%s", c.master_key);
+  return ret;
+}
+
+int
+horus_set_master_key (int fd, char *buf)
+{
+  int ret;
+  struct horus_file_config c;
+  horus_get_file_config (fd, &c);
+  ret = snprintf (c.master_key, sizeof (c.master_key), "%s", buf);
+  horus_set_file_config (fd, &c);
+  return ret;
+}
+/* End of NEW CODE */
 

@@ -1,4 +1,7 @@
 
 - Do not use bcopy(). use memset ('0') for portability.
-
+- Do not use u8.
+- use assert() rather than perror & abort.
+- find_key_by_fd is completely wrong... (must p=p->next; in the loop)
+- do not use label and goto.
 
