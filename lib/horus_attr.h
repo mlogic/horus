@@ -128,4 +128,13 @@ int horus_get_fattr_config_client (struct horus_ea_config *config, struct in_add
 
 int horus_get_fattr_masterkey_config (struct horus_ea_config *config,
                                       char *buf, int bufsiz);
+
+
+int horus_get_file_config (int fd, struct horus_file_config *config);
+int horus_set_file_config (int fd, struct horus_file_config *config);
+int horus_get_master_key (int fd, char *buf, int bufsize);
+int horus_set_master_key (int fd, char *buf);
+
+
+
 #endif

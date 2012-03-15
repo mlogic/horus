@@ -360,7 +360,9 @@ horus_get_master_key (int fd, char *buf, int bufsize)
 {
   int ret;
   struct horus_file_config c;
-  horus_get_file_config (fd, &c);
+  ret = horus_get_file_config (fd, &c);
+  if (ret < 0)
+    return ret;
   ret = snprintf (buf, bufsize, "%s", c.master_key);
   return ret;
 }
@@ -370,7 +372,9 @@ horus_set_master_key (int fd, char *buf)
 {
   int ret;
   struct horus_file_config c;
-  horus_get_file_config (fd, &c);
+  ret = horus_get_file_config (fd, &c);
+  if (ret < 0)
+    memset (&c, 0, sizeof (struct horus_file_config));
   ret = snprintf (c.master_key, sizeof (c.master_key), "%s", buf);
   horus_set_file_config (fd, &c);
   return ret;
