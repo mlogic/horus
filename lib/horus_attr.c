@@ -51,6 +51,16 @@ _lgetxattr(const char *path, const char *name,
 #endif
 }
 
+inline ssize_t
+_fremovexattr (int fd, const char *name, int flags)
+{
+#ifdef __APPLE__
+  return fremovexattr (fd, name, 0);
+#else /* For Linux */
+  return fremovexattr (fd, name, flags);
+#endif
+}
+
 /* OLD CODE */
 
 int
@@ -384,13 +394,56 @@ int
 horus_set_kht_block_size (int fd, int level, unsigned int size)
 {
   int ret;
-  int i;
   struct horus_file_config c;
   ret = horus_get_file_config (fd, &c);
   if (ret < 0)
     memset (&c, 0, sizeof (struct horus_file_config));
   c.kht_block_size[level] = size;
   horus_set_file_config (fd, &c);
+  return ret;
+}
+
+int
+horus_add_client_range (int fd, struct in_addr *prefix, int prefixlen,
+                        unsigned int sblock, unsigned int eblock)
+{
+  int ret;
+  int i;
+  struct horus_file_config c;
+  struct horus_client_range *match;
+  ret = horus_get_file_config (fd, &c);
+  if (ret < 0)
+    memset (&c, 0, sizeof (struct horus_file_config));
+
+  match = NULL;
+  for (i = 0; i < HORUS_MAX_CLIENT_ENTRY; i++)
+    {
+      if (c.client_range[i].start == 0 &&
+          c.client_range[i].end == 0)
+        {
+          match = &c.client_range[i];
+          break;
+        }
+    }
+  if (match)
+    {
+      match->prefix = *prefix;
+      match->prefixlen = prefixlen;
+      match->start = sblock;
+      match->end = eblock;
+    }
+  horus_set_file_config (fd, &c);
+  return ret;
+}
+
+int
+horus_delete_file_config (int fd)
+{
+  int ret;
+  ret = _fremovexattr (fd, HORUS_FATTR_NAME, 0);
+  if (ret < 0)
+    log_error ("fsetxattr() failed in %s: %s",
+               __FUNCTION__, strerror (errno));
   return ret;
 }
 /* End of NEW CODE */

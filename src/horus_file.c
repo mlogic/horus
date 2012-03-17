@@ -46,6 +46,51 @@ usage ()
   exit (0);
 }
 
+unsigned long long
+canonical_byte_size (char *notation, char **endptr)
+{
+  unsigned long long size, unit;
+  char digits[64];
+  unsigned long digit;
+  int len;
+
+  snprintf (digits, sizeof (digits), "%s", notation);
+
+  /* process the unit */
+  unit = 1;
+  len = strlen (digits);
+  switch (digits[len - 1])
+    {
+    case 'K':
+      unit = (unsigned long long) 1024;
+      digits[len - 1] = '\0';
+      break;
+    case 'M':
+      unit = (unsigned long long) 1024 * 1024;
+      digits[len - 1] = '\0';
+      break;
+    case 'G':
+      unit = (unsigned long long) 1024 * 1024 * 1024;
+      digits[len - 1] = '\0';
+      break;
+    case 'T':
+      unit = (unsigned long long) 1024 * 1024 * 1024 * 1024;
+      digits[len - 1] = '\0';
+      break;
+    case 'P':
+      unit = (unsigned long long) 1024 * 1024 * 1024 * 1024 * 1024;
+      digits[len - 1] = '\0';
+      break;
+    default:
+      break;
+    }
+
+  digit = strtoul (digits, endptr, 0);
+  size = digit * unit;
+
+  return size;
+}
+
 int
 horus_file_cmd_show (int fd, char *target)
 {
@@ -68,11 +113,11 @@ horus_file_cmd_show (int fd, char *target)
   printf ("\n");
   printf ("horus client range:\n");
   for (i = 0; i < HORUS_MAX_CLIENT_ENTRY &&
-       c.client_range[i].ipaddr.s_addr != INADDR_ANY; i++)
+       c.client_range[i].prefix.s_addr != INADDR_ANY; i++)
     {
       char buf[32];
-      inet_ntop (AF_INET, &c.client_range[i].ipaddr, buf, sizeof (buf));
-      printf ("  %s: %u - %u\n", buf,
+      inet_ntop (AF_INET, &c.client_range[i].prefix, buf, sizeof (buf));
+      printf ("  %s/%d: %u - %u\n", buf, c.client_range[i].prefixlen,
               c.client_range[i].start, c.client_range[i].end);
     }
 
@@ -88,18 +133,17 @@ horus_file_cmd_master_key (int fd, char *key)
 int
 horus_file_cmd_kht_block_sizes (int fd, int argc, char **argv)
 {
-  int i, len;
+  int i;
   unsigned int kht_block_sizes[HORUS_MAX_KHT_DEPTH];
   unsigned int nblock;
-  char digits[64];
-  unsigned long maxdepth, digit, branch, maxbranch;
-  unsigned long long unit, size, max, upper;
+  unsigned long maxdepth, branch;
+  unsigned long long size, max, upper;
   char *endptr;
 
   maxdepth = HORUS_MAX_KHT_DEPTH;
   if (argc > maxdepth)
     {
-      fprintf (stderr, "maximum depth of %d is allowed (%d specified).\n",
+      fprintf (stderr, "maximum depth of %lu is allowed (%d specified).\n",
                maxdepth, argc);
       return -1;
     }
@@ -109,38 +153,7 @@ horus_file_cmd_kht_block_sizes (int fd, int argc, char **argv)
   /* for each level's block size */
   for (i = 0; i < argc; i++)
     {
-      snprintf (digits, sizeof (digits), "%s", argv[i]);
-
-      /* process the unit */
-      unit = 1;
-      len = strlen (digits);
-      switch (digits[len - 1])
-        {
-        case 'K':
-          unit = (unsigned long long) 1024;
-          digits[len - 1] = '\0';
-          break;
-        case 'M':
-          unit = (unsigned long long) 1024 * 1024;
-          digits[len - 1] = '\0';
-          break;
-        case 'G':
-          unit = (unsigned long long) 1024 * 1024 * 1024;
-          digits[len - 1] = '\0';
-          break;
-        case 'T':
-          unit = (unsigned long long) 1024 * 1024 * 1024 * 1024;
-          digits[len - 1] = '\0';
-          break;
-        case 'P':
-          unit = (unsigned long long) 1024 * 1024 * 1024 * 1024 * 1024;
-          digits[len - 1] = '\0';
-          break;
-        default:
-          break;
-        }
-
-      digit = strtoul (digits, &endptr, 0);
+      size = canonical_byte_size (argv[i], &endptr);
       if (*endptr != '\0')
         {
           fprintf (stderr, "invalid \'%c\' in "
@@ -148,7 +161,6 @@ horus_file_cmd_kht_block_sizes (int fd, int argc, char **argv)
           return -1;
         }
 
-      size = digit * unit;
       if (size % HORUS_BLOCK_SIZE)
         {
           fprintf (stderr, "size not multiple of block size %d in "
@@ -175,7 +187,6 @@ horus_file_cmd_kht_block_sizes (int fd, int argc, char **argv)
 
       branch = upper / nblock;
 
-      assert (nblock <= ULONG_MAX);
       kht_block_sizes[i] = (unsigned int) nblock;
 
       //if (debug)
@@ -191,10 +202,83 @@ horus_file_cmd_kht_block_sizes (int fd, int argc, char **argv)
 }
 
 int
-horus_file_cmd_allow_client_range (int fd, char *ipaddr,
+horus_file_cmd_allow_client_range (int fd, char *prefix,
                                    char *start, char *end)
 {
+  struct in_addr vprefix;
+  int prefixlen = 32;
+  unsigned long long vstart, vend, max;
+  char *p;
+  char *endptr;
+  int ret;
+  unsigned long nb_start, nb_end;
+
+  p = index (prefix, '/');
+  if (p)
+    {
+      *p++ = '\0';
+      prefixlen = strtol (p, &endptr, 0);
+      if (*endptr != '\0')
+        {
+          fprintf (stderr, "invalid prefixlen: %s\n", p);
+          return -1;
+        }
+    }
+
+  ret = inet_pton (AF_INET, prefix, &vprefix);
+  if (ret != 1)
+    {
+      fprintf (stderr, "parse failed in inet_pton(): %s\n", prefix);
+      return -1;
+    }
+
+  max = (unsigned long long) (0xffffffffUL * HORUS_BLOCK_SIZE);
+
+  vstart = canonical_byte_size (start, &endptr);
+  if (*endptr != '\0')
+    {
+      fprintf (stderr, "invalid \'%c\' in start: %s\n", *endptr, start);
+      return -1;
+    }
+  if (vstart > max)
+    {
+      fprintf (stderr, "start %llu exceeds the limit %llu in "
+               "%s\n", vstart, max, start);
+      return -1;
+    }
+  nb_start = (unsigned int) (vstart / HORUS_BLOCK_SIZE);
+
+  vend = canonical_byte_size (end, &endptr);
+  if (*endptr != '\0')
+    {
+      fprintf (stderr, "invalid \'%c\' in end: %s\n", *endptr, end);
+      return -1;
+    }
+  if (vend > max)
+    {
+      fprintf (stderr, "end %llu exceeds the limit %llu in %s\n",
+               vend, max, end);
+      fprintf (stderr, "end adjusted to the limit %llu\n", max);
+      vend = max;
+    }
+  nb_end = (unsigned int) (vend / HORUS_BLOCK_SIZE);
+
+  {
+    char buf[64];
+    inet_ntop (AF_INET, &vprefix, buf, sizeof (buf));
+    printf ("prefix = %s/%d start = %llu end = %llu\n",
+            buf, prefixlen, vstart, vend);
+  }
+
+  horus_add_client_range (fd, &vprefix, prefixlen, nb_start, nb_end);
+
   return 0;
+}
+
+int
+horus_file_cmd_delete (int fd)
+{
+  return horus_delete_file_config (fd);
 }
 
 int
@@ -266,12 +350,12 @@ main (int argc, char **argv)
     horus_file_cmd_kht_block_sizes (fd, argc - 2, &argv[2]);
   else if (! strcmp (cmd, "allow"))
     horus_file_cmd_allow_client_range (fd, argv[2], argv[3], argv[4]);
+  else if (! strcmp (cmd, "delete"))
+    horus_file_cmd_delete (fd);
   else
     fprintf (stderr, "no such commands: %s\n", cmd);
 
   close (fd);
   return 0;
 }
-
-
 

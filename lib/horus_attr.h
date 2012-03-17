@@ -20,7 +20,8 @@
 
 struct horus_client_range
 {
-  struct in_addr ipaddr;
+  struct in_addr prefix;
+  int prefixlen;
   unsigned int start;
   unsigned int end;
 };
@@ -134,7 +135,6 @@ int horus_get_file_config (int fd, struct horus_file_config *config);
 int horus_set_file_config (int fd, struct horus_file_config *config);
 int horus_get_master_key (int fd, char *buf, int bufsize);
 int horus_set_master_key (int fd, char *buf);
-
-
+int horus_set_kht_block_size (int fd, int level, unsigned int size);
 
 #endif
