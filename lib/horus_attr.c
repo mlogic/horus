@@ -379,5 +379,19 @@ horus_set_master_key (int fd, char *buf)
   horus_set_file_config (fd, &c);
   return ret;
 }
+
+int
+horus_set_kht_block_size (int fd, int level, unsigned int size)
+{
+  int ret;
+  int i;
+  struct horus_file_config c;
+  ret = horus_get_file_config (fd, &c);
+  if (ret < 0)
+    memset (&c, 0, sizeof (struct horus_file_config));
+  c.kht_block_size[level] = size;
+  horus_set_file_config (fd, &c);
+  return ret;
+}
 /* End of NEW CODE */
 

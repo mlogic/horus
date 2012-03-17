@@ -3,6 +3,8 @@
 #include <horus_attr.h>
 
 #include <getopt.h>
+#include <assert.h>
+#include <limits.h>
 
 extern char *optarg;
 extern int optind;
@@ -45,7 +47,7 @@ usage ()
 }
 
 int
-horus_file_cmd_show (int fd)
+horus_file_cmd_show (int fd, char *target)
 {
   int i, ret;
   struct horus_file_config c;
@@ -57,7 +59,8 @@ horus_file_cmd_show (int fd)
       return ret;
     }
 
-  printf ("%-24s%s\n", "horus master key:", c.master_key);
+  printf ("file: %s\n", target);
+  printf ("%-24s %s\n", "horus master key:", c.master_key);
   printf ("%-24s", "horus kht block sizes:");
   for (i = 0; i < HORUS_MAX_KHT_DEPTH &&
        c.kht_block_size[i]; i++)
@@ -83,9 +86,121 @@ horus_file_cmd_master_key (int fd, char *key)
 }
 
 int
+horus_file_cmd_kht_block_sizes (int fd, int argc, char **argv)
+{
+  int i, len;
+  unsigned int kht_block_sizes[HORUS_MAX_KHT_DEPTH];
+  unsigned int nblock;
+  char digits[64];
+  unsigned long maxdepth, digit, branch, maxbranch;
+  unsigned long long unit, size, max, upper;
+  char *endptr;
+
+  maxdepth = HORUS_MAX_KHT_DEPTH;
+  if (argc > maxdepth)
+    {
+      fprintf (stderr, "maximum depth of %d is allowed (%d specified).\n",
+               maxdepth, argc);
+      return -1;
+    }
+
+  memset (kht_block_sizes, 0, sizeof (kht_block_sizes));
+
+  /* for each level's block size */
+  for (i = 0; i < argc; i++)
+    {
+      snprintf (digits, sizeof (digits), "%s", argv[i]);
+
+      /* process the unit */
+      unit = 1;
+      len = strlen (digits);
+      switch (digits[len - 1])
+        {
+        case 'K':
+          unit = (unsigned long long) 1024;
+          digits[len - 1] = '\0';
+          break;
+        case 'M':
+          unit = (unsigned long long) 1024 * 1024;
+          digits[len - 1] = '\0';
+          break;
+        case 'G':
+          unit = (unsigned long long) 1024 * 1024 * 1024;
+          digits[len - 1] = '\0';
+          break;
+        case 'T':
+          unit = (unsigned long long) 1024 * 1024 * 1024 * 1024;
+          digits[len - 1] = '\0';
+          break;
+        case 'P':
+          unit = (unsigned long long) 1024 * 1024 * 1024 * 1024 * 1024;
+          digits[len - 1] = '\0';
+          break;
+        default:
+          break;
+        }
+
+      digit = strtoul (digits, &endptr, 0);
+      if (*endptr != '\0')
+        {
+          fprintf (stderr, "invalid \'%c\' in "
+                   "size[%d]: %s\n", *endptr, i, argv[i]);
+          return -1;
+        }
+
+      size = digit * unit;
+      if (size % HORUS_BLOCK_SIZE)
+        {
+          fprintf (stderr, "size not multiple of block size %d in "
+                   "size[%d]: %s\n", HORUS_BLOCK_SIZE, i, argv[i]);
+          return -1;
+        }
+
+      max = (unsigned long long) ULONG_MAX * HORUS_BLOCK_SIZE;
+      if (size > max)
+        {
+          fprintf (stderr, "size %llu exceeds the limit %llu in "
+                   "size[%d]: %s\n", size, max, i, argv[i]);
+          return -1;
+        }
+
+      nblock = (unsigned int) (size / HORUS_BLOCK_SIZE);
+      upper = (i == 0 ? nblock : kht_block_sizes[i - 1]);
+      if (upper % nblock)
+        {
+          fprintf (stderr, "upper is not dividable by current in "
+                   "size[%d]: %s\n", i, argv[i]);
+          return -1;
+        }
+
+      branch = upper / nblock;
+
+      assert (nblock <= ULONG_MAX);
+      kht_block_sizes[i] = (unsigned int) nblock;
+
+      //if (debug)
+        printf ("kht_block_sizes[%2d] = %10u (blks) "
+                "(%13llu bytes) (%lu branch)\n",
+                i, nblock, size, branch);
+    }
+
+  for (i = 0; i < argc; i++)
+    horus_set_kht_block_size (fd, i, kht_block_sizes[i]);
+
+  return 0;
+}
+
+int
+horus_file_cmd_allow_client_range (int fd, char *ipaddr,
+                                   char *start, char *end)
+{
+  return 0;
+}
+
+int
 main (int argc, char **argv)
 {
-  int i, ch;
+  int ch;
   int fd;
   char *target, *cmd, *arg;
 
@@ -124,6 +239,18 @@ main (int argc, char **argv)
         printf ("cmd:    %s\n", arg);
     }
 
+  if (! target)
+    {
+      fprintf (stderr, "specify target filename.\n");
+      return -1;
+    }
+
+  if (! cmd)
+    {
+      fprintf (stderr, "specify command.\n");
+      return -1;
+    }
+
   fd = open (target, O_RDONLY);
   if (fd < 0)
     {
@@ -131,11 +258,16 @@ main (int argc, char **argv)
       return -1;
     }
 
-  printf ("file: %s\n", target);
-  if (cmd && ! strcmp (cmd, "show"))
-    horus_file_cmd_show (fd);
-  if (cmd && ! strcmp (cmd, "master-key") && arg)
+  if (! strcmp (cmd, "show"))
+    horus_file_cmd_show (fd, target);
+  else if (! strcmp (cmd, "master-key") && arg)
     horus_file_cmd_master_key (fd, arg);
+  else if (! strcmp (cmd, "kht-block-sizes"))
+    horus_file_cmd_kht_block_sizes (fd, argc - 2, &argv[2]);
+  else if (! strcmp (cmd, "allow"))
+    horus_file_cmd_allow_client_range (fd, argv[2], argv[3], argv[4]);
+  else
+    fprintf (stderr, "no such commands: %s\n", cmd);
 
   close (fd);
   return 0;
