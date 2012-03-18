@@ -418,10 +418,10 @@ horus_add_client_range (int fd, struct in_addr *prefix, int prefixlen,
   match = NULL;
   for (i = 0; i < HORUS_MAX_CLIENT_ENTRY; i++)
     {
-      if (c.client_range[i].start == 0 &&
-          c.client_range[i].end == 0)
+      struct horus_client_range *p = &c.client_range[i];
+      if (IS_HORUS_CLIENT_RANGE_EMPTY(p))
         {
-          match = &c.client_range[i];
+          match = p;
           break;
         }
     }
@@ -432,6 +432,21 @@ horus_add_client_range (int fd, struct in_addr *prefix, int prefixlen,
       match->start = sblock;
       match->end = eblock;
     }
+  horus_set_file_config (fd, &c);
+  return ret;
+}
+
+int
+horus_clear_client_range (int fd)
+{
+  int ret;
+  int i;
+  struct horus_file_config c;
+  ret = horus_get_file_config (fd, &c);
+  if (ret < 0)
+    memset (&c, 0, sizeof (struct horus_file_config));
+  else
+    memset (&c.client_range, 0, sizeof (c.client_range));
   horus_set_file_config (fd, &c);
   return ret;
 }

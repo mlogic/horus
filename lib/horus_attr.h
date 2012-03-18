@@ -26,6 +26,9 @@ struct horus_client_range
   unsigned int end;
 };
 
+#define IS_HORUS_CLIENT_RANGE_EMPTY(clientp) \
+  ((clientp)->start == 0 && (clientp)->end == 0)
+
 struct horus_file_config
 {
   char master_key[HORUS_MAX_MASTERKEY_LEN];

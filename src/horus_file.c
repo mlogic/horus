@@ -13,14 +13,17 @@ extern int opterr;
 extern int optreset;
 
 char *progname;
+int verbose = 0;
 int debug = 0;
 
-const char *optstring = "dh";
+const char *optstring = "vdh";
 const char *optusage = "\
+-v, --verbose  Turn on verbose mode\n\
 -d, --debug    Turn on debugging mode\n\
 -h, --help     Display this help and exit\n\
 ";
 const struct option longopts[] = {
+  { "verbose", no_argument, NULL, 'v' },
   { "debug", no_argument, NULL, 'd' },
   { "help",  no_argument, NULL, 'h' },
   { NULL,    0,           NULL, 0   }
@@ -30,7 +33,8 @@ const char *cmdusage = "\
   show            Show horus configuration for the file.\n\
   master-key      Set master key. args: <key>\n\
   kht-block-sizes Set block sizes for key hash tree. args: <blocksize>...\n\
-  allow           Allow client access. args: <ipaddr> <start> <end>\n\
+  client add      Allow client access. args: <ipaddr> <start> <end>\n\
+  client clear    Clear client access.\n\
 ";
 
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
@@ -92,10 +96,23 @@ canonical_byte_size (char *notation, char **endptr)
 }
 
 int
+horus_client_range_print (char *buf, int size, struct horus_client_range *p)
+{
+  int ret;
+  char addr[32];
+  inet_ntop (AF_INET, &p->prefix, addr, sizeof (addr));
+  ret = snprintf (buf, size, "%s/%d: %u - %u",
+                  addr, p->prefixlen, p->start, p->end);
+  return ret;
+}
+
+int
 horus_file_cmd_show (int fd, char *target)
 {
   int i, ret;
   struct horus_file_config c;
+  char buf[64];
+  struct horus_client_range *p;
 
   ret = horus_get_file_config (fd, &c);
   if (ret < 0)
@@ -104,30 +121,61 @@ horus_file_cmd_show (int fd, char *target)
       return ret;
     }
 
+  printf ("* the unit is %d-bytes block.\n", HORUS_BLOCK_SIZE);
+
   printf ("file: %s\n", target);
-  printf ("%-24s %s\n", "horus master key:", c.master_key);
-  printf ("%-24s", "horus kht block sizes:");
+  printf ("%-24s %s\n", "  master key:", c.master_key);
+  printf ("%-24s", "  kht block sizes:");
   for (i = 0; i < HORUS_MAX_KHT_DEPTH &&
        c.kht_block_size[i]; i++)
     printf (" %u", c.kht_block_size[i]);
   printf ("\n");
-  printf ("horus client range:\n");
-  for (i = 0; i < HORUS_MAX_CLIENT_ENTRY &&
-       c.client_range[i].prefix.s_addr != INADDR_ANY; i++)
+
+  printf ("%-24s\n", "  client range:");
+  if (debug)
     {
-      char buf[32];
-      inet_ntop (AF_INET, &c.client_range[i].prefix, buf, sizeof (buf));
-      printf ("  %s/%d: %u - %u\n", buf, c.client_range[i].prefixlen,
-              c.client_range[i].start, c.client_range[i].end);
+      for (i = 0; i < HORUS_MAX_CLIENT_ENTRY; i++)
+        {
+          p = &c.client_range[i];
+          horus_client_range_print (buf, sizeof (buf), p);
+          printf ("    client[%d]: %s\n", i, buf);
+        }
+    }
+  else
+    {
+      for (i = 0; i < HORUS_MAX_CLIENT_ENTRY &&
+           ! IS_HORUS_CLIENT_RANGE_EMPTY (&c.client_range[i]); i++)
+        {
+          p = &c.client_range[i];
+          horus_client_range_print (buf, sizeof (buf), p);
+          printf ("    client[%d]: %s\n", i, buf);
+        }
     }
 
   return ret;
 }
 
 int
-horus_file_cmd_master_key (int fd, char *key)
+horus_file_cmd_master_key (int fd, int argc, char **argv)
 {
-  return horus_set_master_key (fd, key);
+  char *key = NULL;
+
+  if (argc > 0)
+    {
+      key = argv[0];
+      argc--;
+      argv++;
+    }
+
+  if (! key)
+    {
+      fprintf (stderr, "specify master-key.\n");
+      return -1;
+    }
+
+  horus_set_master_key (fd, key);
+
+  return 0;
 }
 
 int
@@ -202,8 +250,8 @@ horus_file_cmd_kht_block_sizes (int fd, int argc, char **argv)
 }
 
 int
-horus_file_cmd_allow_client_range (int fd, char *prefix,
-                                   char *start, char *end)
+horus_file_cmd_add_client_range (int fd, char *prefix,
+                                 char *start, char *end)
 {
   struct in_addr vprefix;
   int prefixlen = 32;
@@ -276,6 +324,57 @@ horus_file_cmd_allow_client_range (int fd, char *prefix,
 }
 
 int
+horus_file_cmd_clear_client_range (int fd)
+{
+  horus_clear_client_range (fd);
+  return 0;
+}
+
+int
+horus_file_cmd_client_range (int fd, int argc, char **argv)
+{
+  char *cmd;
+  int ret;
+
+  cmd = NULL;
+  if (argc > 0)
+    {
+      cmd = argv[0];
+      argc--;
+      argv++;
+    }
+
+  if (! cmd)
+    {
+      fprintf (stderr, "specify client sub-command.\n");
+      return -1;
+    }
+
+  if (! strcmp (cmd, "add"))
+    {
+      if (argc < 3)
+        {
+          fprintf (stderr, "Usage: %s ", progname);
+          fprintf (stderr, "client add <IP prefix> <start> <end>\n");
+          return -1;
+        }
+
+      ret = horus_file_cmd_add_client_range (fd, argv[0], argv[1], argv[2]);
+    }
+  else if (! strcmp (cmd, "clear"))
+    {
+      ret = horus_file_cmd_clear_client_range (fd);
+    }
+  else
+    {
+      fprintf (stderr, "no such command: %s\n", cmd);
+      return -1;
+    }
+
+  return ret;
+}
+
+int
 horus_file_cmd_delete (int fd)
 {
   return horus_delete_file_config (fd);
@@ -286,7 +385,7 @@ main (int argc, char **argv)
 {
   int ch;
   int fd;
-  char *target, *cmd, *arg;
+  char *target, *cmd;
 
   progname = (1 ? "horus-file" : argv[0]);
 
@@ -305,13 +404,21 @@ main (int argc, char **argv)
   argc -= optind;
   argv += optind;
 
-  target = cmd = arg = NULL;
+  target = NULL;
   if (argc > 0)
-    target = argv[0];
-  if (argc > 1)
-    cmd = argv[1];
-  if (argc > 2)
-    arg = argv[2];
+    {
+      target = argv[0];
+      argc--;
+      argv++;
+    }
+
+  cmd = NULL;
+  if (argc > 0)
+    {
+      cmd = argv[0];
+      argc--;
+      argv++;
+    }
 
   if (debug)
     {
@@ -319,8 +426,6 @@ main (int argc, char **argv)
         printf ("target: %s\n", target);
       if (cmd)
         printf ("cmd:    %s\n", cmd);
-      if (arg)
-        printf ("cmd:    %s\n", arg);
     }
 
   if (! target)
@@ -344,12 +449,12 @@ main (int argc, char **argv)
 
   if (! strcmp (cmd, "show"))
     horus_file_cmd_show (fd, target);
-  else if (! strcmp (cmd, "master-key") && arg)
-    horus_file_cmd_master_key (fd, arg);
+  else if (! strcmp (cmd, "master-key"))
+    horus_file_cmd_master_key (fd, argc, argv);
   else if (! strcmp (cmd, "kht-block-sizes"))
-    horus_file_cmd_kht_block_sizes (fd, argc - 2, &argv[2]);
-  else if (! strcmp (cmd, "allow"))
-    horus_file_cmd_allow_client_range (fd, argv[2], argv[3], argv[4]);
+    horus_file_cmd_kht_block_sizes (fd, argc, argv);
+  else if (! strcmp (cmd, "client"))
+    horus_file_cmd_client_range (fd, argc, argv);
   else if (! strcmp (cmd, "delete"))
     horus_file_cmd_delete (fd);
   else

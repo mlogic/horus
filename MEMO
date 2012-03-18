@@ -5,3 +5,6 @@
 - find_key_by_fd is completely wrong... (must p=p->next; in the loop)
 - do not use label and goto.
 
+
+- the method for debugging: sh ./libtool --mode=execute gdb horus-file
+
