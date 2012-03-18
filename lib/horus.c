@@ -21,6 +21,51 @@ int is_init = 0;
 /* libhorus tracks files by file descriptor. */
 fd_set fdset;
 
+unsigned long long
+canonical_byte_size (char *notation, char **endptr)
+{
+  unsigned long long size, unit;
+  char digits[64];
+  unsigned long digit;
+  int len;
+
+  snprintf (digits, sizeof (digits), "%s", notation);
+
+  /* process the unit */
+  unit = 1;
+  len = strlen (digits);
+  switch (digits[len - 1])
+    {
+    case 'K':
+      unit = (unsigned long long) 1024;
+      digits[len - 1] = '\0';
+      break;
+    case 'M':
+      unit = (unsigned long long) 1024 * 1024;
+      digits[len - 1] = '\0';
+      break;
+    case 'G':
+      unit = (unsigned long long) 1024 * 1024 * 1024;
+      digits[len - 1] = '\0';
+      break;
+    case 'T':
+      unit = (unsigned long long) 1024 * 1024 * 1024 * 1024;
+      digits[len - 1] = '\0';
+      break;
+    case 'P':
+      unit = (unsigned long long) 1024 * 1024 * 1024 * 1024 * 1024;
+      digits[len - 1] = '\0';
+      break;
+    default:
+      break;
+    }
+
+  digit = strtoul (digits, endptr, 0);
+  size = digit * unit;
+
+  return size;
+}
+
 void
 horus_init ()
 {

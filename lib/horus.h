@@ -54,6 +54,9 @@
 
 extern int debug;
 
+unsigned long long
+canonical_byte_size (char *notation, char **endptr);
+
 void horus_init ();
 
 int horus_open (const int fd, const char *path, int flag, mode_t mode);

@@ -268,15 +268,6 @@ horus_key (char *key, size_t *key_len, int filepos,
     }
 }
 
-void
-horus_get_key_from_env (char **ktype, char **kvalue)
-{
-  *ktype = getenv ("HORUS_KEY_TYPE");
-  *kvalue = getenv ("HORUS_KEY_VALUE");
-}
-
-
-
 
 /** Scan key_store and look for entry of fd
  */
