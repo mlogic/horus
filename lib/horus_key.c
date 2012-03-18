@@ -20,7 +20,7 @@
 struct _key_store_entry *key_store = NULL, *key_store_tail = NULL;
 
 void
-key_to_value (char *key, int *key_len, char *string)
+key_str2val (char *key, int *key_len, char *string)
 {
   char *p;
   char c[2];
@@ -57,7 +57,7 @@ key_to_value (char *key, int *key_len, char *string)
 }
 
 void
-key_to_string (char *buf, int size, char *key, int key_len)
+key_val2str (char *buf, int size, char *key, int key_len)
 {
   int i;
   unsigned char val0, val1;
@@ -95,7 +95,7 @@ char *
 print_key (char *key, int key_len)
 {
   static char buf[SHA_DIGEST_LENGTH * 2 + 1];
-  key_to_string (buf, sizeof (buf), key, key_len);
+  key_val2str (buf, sizeof (buf), key, key_len);
   return buf;
 }
 

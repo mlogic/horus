@@ -5,6 +5,10 @@
 - find_key_by_fd is completely wrong... (must p=p->next; in the loop)
 - do not use label and goto.
 
+- <openssl/sha.h> is not necessary in lib/horus_key.c since <horus.h>
+  will include it depending upon the result in config.h
+- do not use malloc, vectorx, or any other heavy task in lib/horus_key.c
+
 
 - the method for debugging: sh ./libtool --mode=execute gdb horus-file
 
