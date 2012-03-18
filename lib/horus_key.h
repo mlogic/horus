@@ -33,8 +33,8 @@ struct _key_store_entry
   struct _key_store_entry *next;
 };
 
-void key_to_value (char *key, int *key_len, char *string);
-void key_to_string (char *buf, int size, char *key, int key_len);
+void key_str2val (char *key, int *key_len, char *string);
+void key_val2str (char *buf, int size, char *key, int key_len);
 char *print_key (char *key, int key_len);
 char *block_key (char *key, size_t *key_len,
 		 char *parent, int parent_len, int x, int y);
