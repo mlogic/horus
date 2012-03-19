@@ -57,7 +57,7 @@ _fremovexattr (int fd, const char *name, int flags)
 #ifdef __APPLE__
   return fremovexattr (fd, name, 0);
 #else /* For Linux */
-  return fremovexattr (fd, name, flags);
+  return fremovexattr (fd, name);
 #endif
 }
 
