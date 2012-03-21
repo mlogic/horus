@@ -10,78 +10,85 @@
 
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #define MAXNAMELEN 4096
 #define MAXKEYS 20
 
-struct range {
-	int x;
-	int y;
-};
-typedef struct range range;
+  struct range
+  {
+    int x;
+    int y;
+  };
+  typedef struct range range;
 
-struct rangekey {
-	char *key;
-	int x;
-	int y;
-	int err;
-};
-typedef struct rangekey rangekey;
+  struct rangekey
+  {
+    char *key;
+    int x;
+    int y;
+    int err;
+  };
+  typedef struct rangekey rangekey;
 
-struct key_request {
-	char *filename;
-	struct {
-		u_int ranges_len;
-		range *ranges_val;
-	} ranges;
-};
-typedef struct key_request key_request;
+  struct key_request
+  {
+    char *filename;
+    struct
+    {
+      u_int ranges_len;
+      range *ranges_val;
+    } ranges;
+  };
+  typedef struct key_request key_request;
 
-struct key_rtn {
-	struct {
-		u_int keys_len;
-		rangekey *keys_val;
-	} keys;
-	int err;
-};
-typedef struct key_rtn key_rtn;
+  struct key_rtn
+  {
+    struct
+    {
+      u_int keys_len;
+      rangekey *keys_val;
+    } keys;
+    int err;
+  };
+  typedef struct key_rtn key_rtn;
 
 #define KDS_RPC 20380
 #define KEYREQVERS 1
 
 #if defined(__STDC__) || defined(__cplusplus)
 #define KEYREQ 1
-extern  struct key_rtn * keyreq_1(struct key_request *, CLIENT *);
-extern  struct key_rtn * keyreq_1_svc(struct key_request *, struct svc_req *);
-extern int kds_rpc_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
+  extern struct key_rtn *keyreq_1 (struct key_request *, CLIENT *);
+  extern struct key_rtn *keyreq_1_svc (struct key_request *, struct svc_req *);
+  extern int kds_rpc_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
 
-#else /* K&R C */
+#else                           /* K&R C */
 #define KEYREQ 1
-extern  struct key_rtn * keyreq_1();
-extern  struct key_rtn * keyreq_1_svc();
-extern int kds_rpc_1_freeresult ();
-#endif /* K&R C */
+  extern struct key_rtn *keyreq_1 ();
+  extern struct key_rtn *keyreq_1_svc ();
+  extern int kds_rpc_1_freeresult ();
+#endif                          /* K&R C */
 
 /* the xdr functions */
 
 #if defined(__STDC__) || defined(__cplusplus)
-extern  bool_t xdr_range (XDR *, range*);
-extern  bool_t xdr_rangekey (XDR *, rangekey*);
-extern  bool_t xdr_key_request (XDR *, key_request*);
-extern  bool_t xdr_key_rtn (XDR *, key_rtn*);
+  extern bool_t xdr_range (XDR *, range *);
+  extern bool_t xdr_rangekey (XDR *, rangekey *);
+  extern bool_t xdr_key_request (XDR *, key_request *);
+  extern bool_t xdr_key_rtn (XDR *, key_rtn *);
 
-#else /* K&R C */
-extern bool_t xdr_range ();
-extern bool_t xdr_rangekey ();
-extern bool_t xdr_key_request ();
-extern bool_t xdr_key_rtn ();
+#else                           /* K&R C */
+  extern bool_t xdr_range ();
+  extern bool_t xdr_rangekey ();
+  extern bool_t xdr_key_request ();
+  extern bool_t xdr_key_rtn ();
 
-#endif /* K&R C */
+#endif                          /* K&R C */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* !_KDS_RPC_H_RPCGEN */
+#endif                          /* !_KDS_RPC_H_RPCGEN */

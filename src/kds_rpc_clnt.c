@@ -3,23 +3,24 @@
  * It was generated using rpcgen.
  */
 
-#include <memory.h> /* for memset */
+#include <memory.h>             /* for memset */
 #include "kds_rpc.h"
 
 /* Default timeout can be changed using clnt_control() */
 static struct timeval TIMEOUT = { 25, 0 };
 
 struct key_rtn *
-keyreq_1(struct key_request *argp, CLIENT *clnt)
+keyreq_1 (struct key_request *argp, CLIENT * clnt)
 {
-	static struct key_rtn clnt_res;
+  static struct key_rtn clnt_res;
 
-	memset((char *)&clnt_res, 0, sizeof(clnt_res));
-	if (clnt_call (clnt, KEYREQ,
-		(xdrproc_t) xdr_key_request, (caddr_t) argp,
-		(xdrproc_t) xdr_key_rtn, (caddr_t) &clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
-	}
-	return (&clnt_res);
+  memset ((char *) &clnt_res, 0, sizeof (clnt_res));
+  if (clnt_call (clnt, KEYREQ,
+                 (xdrproc_t) xdr_key_request, (caddr_t) argp,
+                 (xdrproc_t) xdr_key_rtn, (caddr_t) & clnt_res,
+                 TIMEOUT) != RPC_SUCCESS)
+    {
+      return (NULL);
+    }
+  return (&clnt_res);
 }

@@ -6,55 +6,58 @@
 #include "kds_rpc.h"
 
 bool_t
-xdr_range (XDR *xdrs, range *objp)
+xdr_range (XDR * xdrs, range * objp)
 {
-	register int32_t *buf;
+  register int32_t *buf;
 
-	 if (!xdr_int (xdrs, &objp->x))
-		 return FALSE;
-	 if (!xdr_int (xdrs, &objp->y))
-		 return FALSE;
-	return TRUE;
+  if (!xdr_int (xdrs, &objp->x))
+    return FALSE;
+  if (!xdr_int (xdrs, &objp->y))
+    return FALSE;
+  return TRUE;
 }
 
 bool_t
-xdr_rangekey (XDR *xdrs, rangekey *objp)
+xdr_rangekey (XDR * xdrs, rangekey * objp)
 {
-	register int32_t *buf;
+  register int32_t *buf;
 
-	 if (!xdr_string (xdrs, &objp->key, 41))
-		 return FALSE;
-	 if (!xdr_int (xdrs, &objp->x))
-		 return FALSE;
-	 if (!xdr_int (xdrs, &objp->y))
-		 return FALSE;
-	 if (!xdr_int (xdrs, &objp->err))
-		 return FALSE;
-	return TRUE;
+  if (!xdr_string (xdrs, &objp->key, 41))
+    return FALSE;
+  if (!xdr_int (xdrs, &objp->x))
+    return FALSE;
+  if (!xdr_int (xdrs, &objp->y))
+    return FALSE;
+  if (!xdr_int (xdrs, &objp->err))
+    return FALSE;
+  return TRUE;
 }
 
 bool_t
-xdr_key_request (XDR *xdrs, key_request *objp)
+xdr_key_request (XDR * xdrs, key_request * objp)
 {
-	register int32_t *buf;
+  register int32_t *buf;
 
-	 if (!xdr_string (xdrs, &objp->filename, MAXNAMELEN))
-		 return FALSE;
-	 if (!xdr_array (xdrs, (char **)&objp->ranges.ranges_val, (u_int *) &objp->ranges.ranges_len, MAXKEYS,
-		sizeof (range), (xdrproc_t) xdr_range))
-		 return FALSE;
-	return TRUE;
+  if (!xdr_string (xdrs, &objp->filename, MAXNAMELEN))
+    return FALSE;
+  if (!xdr_array
+      (xdrs, (char **) &objp->ranges.ranges_val,
+       (u_int *) & objp->ranges.ranges_len, MAXKEYS, sizeof (range),
+       (xdrproc_t) xdr_range))
+    return FALSE;
+  return TRUE;
 }
 
 bool_t
-xdr_key_rtn (XDR *xdrs, key_rtn *objp)
+xdr_key_rtn (XDR * xdrs, key_rtn * objp)
 {
-	register int32_t *buf;
+  register int32_t *buf;
 
-	 if (!xdr_array (xdrs, (char **)&objp->keys.keys_val, (u_int *) &objp->keys.keys_len, MAXKEYS,
-		sizeof (rangekey), (xdrproc_t) xdr_rangekey))
-		 return FALSE;
-	 if (!xdr_int (xdrs, &objp->err))
-		 return FALSE;
-	return TRUE;
+  if (!xdr_array
+      (xdrs, (char **) &objp->keys.keys_val, (u_int *) & objp->keys.keys_len,
+       MAXKEYS, sizeof (rangekey), (xdrproc_t) xdr_rangekey))
+    return FALSE;
+  if (!xdr_int (xdrs, &objp->err))
+    return FALSE;
+  return TRUE;
 }

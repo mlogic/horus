@@ -1,5 +1,5 @@
 const MAXNAMELEN = 4096;
-const MAXKEYS = 20; /* Should be sufficient */
+const MAXKEYS = 20;             /* Should be sufficient */
 
 struct range
 {
@@ -10,7 +10,7 @@ struct range
 
 struct rangekey
 {
-  string key <41>;
+  string key < 41 >;
   int x;
   int y;
   int err;
@@ -19,12 +19,12 @@ struct rangekey
 struct key_request
 {
   string filename < MAXNAMELEN >;
-  range ranges <MAXKEYS>;
+  range ranges < MAXKEYS >;
 };
 
 struct key_rtn
 {
-  rangekey keys <MAXKEYS>;
+  rangekey keys < MAXKEYS >;
   int err;
 };
 

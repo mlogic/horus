@@ -37,10 +37,12 @@ decr_threadcount (void)
   pthread_mutex_unlock (&kds_client_th);
 }
 
-static int current_threadcount(void)
+static int
+current_threadcount (void)
 {
 
   int val;
+
   pthread_mutex_lock (&kds_client_th);
   val = num_threads;
   pthread_mutex_unlock (&kds_client_th);
@@ -51,12 +53,12 @@ void *
 handle_kds_client (void *p)
 {
   int priv_fd, fd, th_val;
-  int ret, client_len,rbuf_len;
+  int ret, client_len, rbuf_len;
   short syn_ack = 0x11;
   char *buf;
   struct sockaddr_in client;
 
-  struct key_request kr,kr1;
+  struct key_request kr, kr1;
 
   pthread_detach (pthread_self ());
   buf = malloc (MAX_RECV_LEN + 1);
@@ -66,15 +68,15 @@ handle_kds_client (void *p)
   incr_threadcount ();
 
   rbuf_len = recvfrom (fd, buf, MAX_RECV_LEN, 0, (struct sockaddr *) &client,
-                  &client_len);
+                       &client_len);
 
-  if (rbuf_len <=0)
-  {
-    decr_threadcount();
-    pthread_exit (NULL);
-  }
+  if (rbuf_len <= 0)
+    {
+      decr_threadcount ();
+      pthread_exit (NULL);
+    }
 
- 
+
   priv_fd = udp_socket ("0.0.0.0", 0);
   if (priv_fd < 0)
     {
@@ -83,12 +85,11 @@ handle_kds_client (void *p)
     }
   fcntl (priv_fd, F_SETFL, O_NONBLOCK);
   sendto (priv_fd, &syn_ack, sizeof (syn_ack), 0, (struct sockaddr *) &client,
-            client_len);
+          client_len);
 
 /* Calculate and send key */
 
-  sendto (priv_fd, buf, rbuf_len , 0, (struct sockaddr *) &client,
-          client_len);
+  sendto (priv_fd, buf, rbuf_len, 0, (struct sockaddr *) &client, client_len);
 
   close (priv_fd);
   decr_threadcount ();
@@ -133,13 +134,13 @@ main (int argc, char **argv)
   FD_SET (fd, &fds);
   fcntl (fd, F_SETFL, O_NONBLOCK);
 
-  printf("KDS started!\n");
+  printf ("KDS started!\n");
 
   while (1)
     {
       ret = select (fd + 1, &fds, NULL, NULL, NULL);
       assert (ret >= 0);
-      if (current_threadcount() >= THREAD_MAX)
+      if (current_threadcount () >= THREAD_MAX)
         continue;
       pthread_create (&th_id[num_threads], NULL, handle_kds_client,
                       (void *) &fd);
