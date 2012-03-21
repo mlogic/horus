@@ -2,3 +2,9 @@ check_aes
 check_api
 check_horus_key
 benchmark_key_utils
+
+FILENAME
+horus-benchmark-key.log
+horus-benchmark-key.data
+horus-benchmark-key.eps
+horus-benchmark-key.png

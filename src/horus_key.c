@@ -6,6 +6,7 @@
 #include <getopt.h>
 #include <assert.h>
 #include <limits.h>
+#include "timeval.h"
 
 extern char *optarg;
 extern int optind;
@@ -18,21 +19,23 @@ extern horus_verbose;
 
 char *progname;
 
-const char *optstring = "vdhx:y:";
+const char *optstring = "vdhx:y:b";
 const char *optusage = "\
--v, --verbose  Turn on verbose mode\n\
--d, --debug    Turn on debugging mode\n\
--h, --help     Display this help and exit\n\
--x, --key-x    Specify x to calculate key K_x,y\n\
--y, --key-y    Specify y to calculate key K_x,y\n\
+-v, --verbose     Turn on verbose mode\n\
+-d, --debug       Turn on debugging mode\n\
+-h, --help        Display this help and exit\n\
+-x, --key-x       Specify x to calculate key K_x,y\n\
+-y, --key-y       Specify y to calculate key K_x,y\n\
+-b, --benchmark   Turn on benchmark mode: <depth> <branch> <blocksize> <filesize>\n\
 ";
 const struct option longopts[] = {
-  { "verbose", no_argument, NULL, 'v' },
-  { "debug", no_argument, NULL, 'd' },
-  { "help",  no_argument, NULL, 'h' },
-  { "key-x", required_argument, NULL, 'x' },
-  { "key-y", required_argument, NULL, 'y' },
-  { NULL,    0,           NULL, 0   }
+  { "verbose",    no_argument,        NULL, 'v' },
+  { "debug",      no_argument,        NULL, 'd' },
+  { "help",       no_argument,        NULL, 'h' },
+  { "key-x",      required_argument,  NULL, 'x' },
+  { "key-y",      required_argument,  NULL, 'y' },
+  { "benchmark",  no_argument,        NULL, 'b' },
+  { NULL,         0,                  NULL,  0  }
 };
 
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
@@ -47,6 +50,110 @@ usage ()
   exit (0);
 }
 
+void
+horus_key_calc_benchmark (struct horus_file_config *c, int argc, char **argv)
+{
+  int i;
+  char key[64];
+  int key_len;
+  unsigned long long x, y, nblocks;
+  int depth = 0;
+  int branch = 0;
+  unsigned long long blocksize = 0;
+  unsigned long long filesize = 2 * 1024 * 1024 * 1024LLU;
+  struct timeval start, end, res;
+  double time;
+  char buf[128];
+
+  if (argc > 0)
+    {
+      depth = atoi (argv[0]);
+      argc--;
+      argv++;
+    }
+  if (argc > 0)
+    {
+      branch = atoi (argv[0]);
+      argc--;
+      argv++;
+    }
+  if (argc > 0)
+    {
+      blocksize = canonical_byte_size (argv[0], NULL);
+      argc--;
+      argv++;
+    }
+  if (argc > 0)
+    {
+      filesize = canonical_byte_size (argv[0], NULL);
+      argc--;
+      argv++;
+    }
+
+  if (depth || branch || blocksize)
+    {
+      if (! depth)
+        depth = 10;
+      if (! branch)
+        branch = 4;
+      if (! blocksize)
+        blocksize = 4096;
+
+      memset (c->kht_block_size, 0, sizeof (c->kht_block_size));
+      i = depth;
+      while (i > 0)
+        {
+          i--;
+          if (i == depth - 1)
+            c->kht_block_size[i] = 1;
+          else
+            c->kht_block_size[i] = c->kht_block_size[i + 1] * branch;
+        }
+    }
+  else
+    {
+       depth = 0;
+       for (i = 0; i < HORUS_MAX_KHT_DEPTH; i++)
+         if (c->kht_block_size[i])
+           depth++;
+    }
+
+  blocksize = HORUS_BLOCK_SIZE;
+
+  x = depth - 1;
+  nblocks = filesize / blocksize;
+
+  printf ("depth: %d branch: %d blocksize: %llu "
+          "filesize: %llu #blocks: %llu\n",
+          depth, branch, blocksize, filesize, nblocks);
+
+  printf ("kht block sizes:");
+  for (i = 0; i < HORUS_MAX_KHT_DEPTH &&
+       c->kht_block_size[i]; i++)
+    printf (" %u", c->kht_block_size[i]);
+  printf ("\n");
+
+  gettimeofday (&start, NULL);
+
+  for (y = 0; y < nblocks; y++)
+    {
+      key_len = sizeof (key);
+      horus_key_by_master (key, &key_len, x, y,
+                           c->master_key, strlen (c->master_key),
+                           c->kht_block_size);
+    }
+
+  gettimeofday (&end, NULL);
+
+  timeval_sub (&end, &start, &res);
+  time = res.tv_sec + res.tv_usec * 0.000001;
+  snprint_timeval (buf, sizeof (buf), &res);
+
+  printf ("depth: %d branch: %d blocksize: %llu "
+          "filesize: %llu #blocks: %llu %s secs ( %f q/s\n",
+          depth, branch, blocksize, filesize, nblocks, buf, nblocks/time);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -55,6 +162,7 @@ main (int argc, char **argv)
   char *target, *cmd;
   unsigned long long offset;
   struct horus_file_config c;
+  int benchmark = 0;
 
   int i, ret;
   int x, y;
@@ -86,6 +194,9 @@ main (int argc, char **argv)
         case 'y':
           stry = optarg;
           keyy = atoi (stry);
+          break;
+        case 'b':
+          benchmark++;
           break;
         default:
           usage ();
@@ -119,7 +230,7 @@ main (int argc, char **argv)
 
   /* Byte offset */
   offset = 0;
-  if (argc > 0)
+  if (! benchmark && argc > 0)
     {
       char *endptr;
       offset = canonical_byte_size (argv[0], &endptr);
@@ -163,6 +274,13 @@ main (int argc, char **argv)
     {
       for (i = 0; i < HORUS_MAX_KHT_DEPTH && c.kht_block_size[i]; i++)
         printf ("kht_block_size[%d] = %u\n", i, c.kht_block_size[i]);
+    }
+
+  if (benchmark)
+    {
+      horus_key_calc_benchmark (&c, argc, argv);
+      close (fd);
+      return 0;
     }
 
   if (strx)

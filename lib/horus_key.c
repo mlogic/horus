@@ -264,8 +264,16 @@ horus_key_by_master (char *key, size_t *key_len, int x, int y,
   memcpy (k0, str_k0, sizeof (k0));
   k0len = strlen (str_k0);
 
-  horus_block_key (key, key_len, x, y, k0, k0len, xk0, yk0,
-                   kht_block_size);
+  if (xk0 == x)
+    {
+      memcpy (key, k0, sizeof (key));
+      *key_len = k0len;
+    }
+  else
+    {
+      horus_block_key (key, key_len, x, y, k0, k0len, xk0, yk0,
+                       kht_block_size);
+    }
 
   return 0;
 }
