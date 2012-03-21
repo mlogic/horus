@@ -13,9 +13,10 @@ extern int optopt;
 extern int opterr;
 extern int optreset;
 
+extern horus_debug;
+extern horus_verbose;
+
 char *progname;
-int verbose = 0;
-//int debug = 0;
 
 const char *optstring = "vdhx:y:";
 const char *optusage = "\
@@ -60,9 +61,8 @@ main (int argc, char **argv)
   int keyx, keyy;
   char *strx, *stry;
 
-  char parent[SHA_DIGEST_LENGTH * 2 + 1];
-  char key[SHA_DIGEST_LENGTH];
-  int parent_len, key_len;
+  char key[SHA_DIGEST_LENGTH * 2 + 1];
+  size_t key_len;
 
   progname = (1 ? "horus-key" : argv[0]);
 
@@ -74,10 +74,10 @@ main (int argc, char **argv)
       switch (ch)
         {
         case 'd':
-          debug++;
+          horus_debug++;
           break;
         case 'v':
-          verbose++;
+          horus_verbose++;
           break;
         case 'x':
           strx = optarg;
@@ -154,16 +154,12 @@ main (int argc, char **argv)
       return ret;
     }
 
-  /* Master key */
-  memset (parent, 0, sizeof (parent));
-  snprintf (parent, sizeof (parent), "%s", c.master_key);
-  parent_len = strlen (parent);
-
-  if (verbose)
+  if (horus_verbose)
     printf ("offset = %llu, master = %s(%d).\n",
-            offset, print_key (parent, parent_len), parent_len);
+            offset, print_key (c.master_key, (int) strlen (c.master_key)),
+            (int) strlen (c.master_key));
 
-  if (verbose)
+  if (horus_verbose)
     {
       for (i = 0; i < HORUS_MAX_KHT_DEPTH && c.kht_block_size[i]; i++)
         printf ("kht_block_size[%d] = %u\n", i, c.kht_block_size[i]);
@@ -189,13 +185,16 @@ main (int argc, char **argv)
       y = offset / (c.kht_block_size[x] * HORUS_BLOCK_SIZE);
     }
 
-  if (verbose)
+  if (horus_verbose)
     printf ("calculate K%d,%d.\n", x, y);
 
-  horus_key_by_master (key, &key_len, x, y, parent, parent_len);
+  key_len = sizeof (key);
+  horus_key_by_master (key, &key_len, x, y,
+                       c.master_key, strlen (c.master_key),
+                       c.kht_block_size);
 
-  printf ("K%d,%d = %s(%d) [%llu-%llu]\n",
-    x, y, print_key (key, key_len), key_len,
+  printf ("K_%d,%d = %s(%d) [%llu-%llu]\n",
+    x, y, print_key (key, key_len), (int) key_len,
     (unsigned long long) c.kht_block_size[x] * HORUS_BLOCK_SIZE * y,
     (unsigned long long) c.kht_block_size[x] * HORUS_BLOCK_SIZE * (y + 1) - 1);
 

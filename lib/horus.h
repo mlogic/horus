@@ -53,6 +53,8 @@
 #include <minmax.h>
 
 extern int debug;
+extern int horus_debug;
+extern int horus_verbose;
 
 unsigned long long
 canonical_byte_size (char *notation, char **endptr);

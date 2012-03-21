@@ -12,10 +12,9 @@
  */
 
 #include <horus.h>
-
-#include <log.h>
+#include <horus_attr.h>
 #include <horus_key.h>
-#include <openssl/sha.h>
+#include <log.h>
 
 struct _key_store_entry *key_store = NULL, *key_store_tail = NULL;
 
@@ -99,6 +98,7 @@ print_key (char *key, int key_len)
   return buf;
 }
 
+/* K_{x,y} = KH(K_{parent},x||y) */
 char *
 block_key (char *key, size_t *key_len,
            char *parent, int parent_len, int x, int y)
@@ -107,6 +107,11 @@ block_key (char *key, size_t *key_len,
   int size;
   unsigned int out_key_len;
 
+  /* The message x||y */
+  assert (x < 256);
+  assert (y < 65536 * 256);
+  /* Currently we are using string messages for SHA1. */
+#undef NON_STRING_MESSAGE
 #ifdef NON_STRING_MESSAGE
   u_int32_t x__y = ((x << 24) | y);
   message = &x__y;
@@ -117,13 +122,6 @@ block_key (char *key, size_t *key_len,
   size = sizeof (x__y) - 1;
   snprintf (x__y, sizeof (x__y), "%016x", ((x << 24) | y));
 #endif /*NON_STRING_MESSAGE*/
-
-  if (debug)
-    {
-      printf ("parent = %s\n", print_key (parent, parent_len));
-      printf ("x: %d, y: %d, message: %s, size: %d\n", x, y, x__y, size);
-      printf ("message = %s\n", print_key (x__y, size));
-    }
 
 #ifdef __APPLE__
   CCHmac (kCCHmacAlgSHA1, parent, parent_len,
@@ -138,135 +136,140 @@ block_key (char *key, size_t *key_len,
   *key_len = (size_t)out_key_len;
 #endif /*__APPLE__*/
 
-  if (debug)
-    printf ("key = %s\n", print_key (key, *key_len));
+  if (debug || horus_debug)
+    {
+      printf ("parent = %s\n", print_key (parent, parent_len));
+      printf ("x: %d, y: %d, message: %s, size: %d\n", x, y, x__y, size);
+      printf ("message = %s\n", print_key (x__y, size));
+      printf ("key = %s\n", print_key (key, *key_len));
+    }
 
   return key;
 }
 
+/* Non-recursive version of horus_key_from_to() */
 int
-horus_key_from_to (char *key, int *key_len, int x, int y,
-                   char *parent, int parent_len, int parent_x, int parent_y)
+horus_block_key (char *k, size_t *klen, int kx, int ky,
+                 char *kp, size_t kplen, int kpx, int kpy,
+                 unsigned int *kht_block_size)
 {
-  char next_parent[SHA_DIGEST_LENGTH * 2 + 1];
-  char ibuf[SHA_DIGEST_LENGTH];
-  int next_parent_len, ibuf_len;
-
-  if (! log_on)
-    log_init ();
-
-  if (debug)
-    syslog (LOG_INFO, "%s(): x = %d, y = %d, parent_x = %d, parent_y = %d",
-            __func__, x, y, parent_x, parent_y);
-
-  /* Base case 1 */
-  if (parent_x == x)
-    {
-      if (parent_y != y)
-        {
-          syslog (LOG_WARNING, "%s(): range mismatch: "
-                  "x = %d, y = %d, parent_x = %d, parent_y = %d",
-                  __func__, x, y, parent_x, parent_y);
-          return -1;
-        }
-
-      /* key = int(parent), because key == parent */
-      key_str2val (key, key_len, parent);
-
-      return 0;
-    }
-
-  /* Base case 2 */
-  if (parent_x == x - 1)
-    {
-      if (parent_y != y / 4)
-        {
-          syslog (LOG_WARNING, "%s(): range mismatch: "
-                  "x = %d, y = %d, parent_x = %d, parent_y = %d",
-                  __func__, x, y, parent_x, parent_y);
-          return -1;
-        }
-
-      block_key (key, key_len, parent, parent_len, x, y);
-      return 0;
-    }
-
-  /* Recursive */
-  horus_key_from_to (ibuf, &ibuf_len, x - 1, y / 4,
-                     parent, parent_len, parent_x, parent_y);
-
-  /* parent = str(key) */
-  key_val2str (next_parent, sizeof (next_parent), ibuf, ibuf_len);
-  next_parent_len = strlen (next_parent);
-
-  block_key (key, key_len, next_parent, next_parent_len, x, y);
-
-  return 0;
-}
-
-int
-horus_key_by_master (char *key, int *key_len, int x, int y,
-                      char *master, int master_len)
-{
-  char key00[SHA_DIGEST_LENGTH * 2 + 1];
-  char ibuf[SHA_DIGEST_LENGTH];
-  int key00_len, ibuf_len;
-
-  if (! log_on)
-    log_init ();
-
-  if (debug)
-    syslog (LOG_INFO, "%s(): x = %d, y = %d", __func__, x, y);
-
-  block_key (ibuf, &ibuf_len, master, master_len, 0, 0);
-  key_val2str (key00, sizeof (key00), ibuf, ibuf_len);
-  key00_len = strlen (key00);
-
-  horus_key_from_to (key, key_len, x, y, key00, key00_len, 0, 0);
-  return 0;
-}
-
-void
-horus_key (char *key, size_t *key_len, int filepos,
-           char *ktype, char *kvalue)
-{
+  int i;
   int x, y;
-  int rkey_x, rkey_y;
-  char keybuf[SHA_DIGEST_LENGTH * 2 + 1];
+  int branch;
+  int xstack[HORUS_MAX_KHT_DEPTH];
+  int ystack[HORUS_MAX_KHT_DEPTH];
 
-  x = 9;
-  if (0 != filepos % MIN_CHUNK_SIZE)
-    {
-      log_error ("Non-block-aligned access is not supported yet.");
-      abort ();
-    }
-  y = filepos / MIN_CHUNK_SIZE;
+  char tmp_k[SHA_DIGEST_LENGTH * 2 + 1];
+  char tmp_kp[SHA_DIGEST_LENGTH * 2 + 1];
+  size_t tmp_klen, tmp_kplen;
 
-  if (! ktype || ! kvalue)
+  char str_k[SHA_DIGEST_LENGTH * 2 + 1];
+
+  if (horus_debug)
+    printf ("%s(): kx = %d, ky = %d, kpx = %d, kpy = %d\n",
+            __func__, kx, ky, kpx, kpy);
+
+  assert (kx < HORUS_MAX_KHT_DEPTH);
+  assert (kpx < HORUS_MAX_KHT_DEPTH);
+  assert (kpx < kx);
+
+  memset (xstack, 0, sizeof (xstack));
+  memset (ystack, 0, sizeof (ystack));
+
+  memcpy (tmp_kp, kp, MIN (sizeof (tmp_kp), kplen));
+  tmp_kplen = kplen;
+
+  /* Go up KHT remembering the x,y in the stack */
+  i = 0;
+  x = kx;
+  y = ky;
+  while (x > kpx)
     {
-      *key_len = 0;
-      return;
+      assert (i < HORUS_MAX_KHT_DEPTH);
+      xstack[i] = x;
+      ystack[i] = y;
+      i++;
+
+      branch = kht_block_size[x - 1] / kht_block_size[x];
+      x -= 1;
+      y /= branch;
     }
 
-  if (! strcasecmp (ktype, "master"))
+  assert (x == kpx);
+  assert (y == kpy); // Otherwise, outside of the parent range.
+
+  /* Go down KHT back to the requested key */
+  while (i > 0)
     {
-      syslog (LOG_INFO, "key type: master");
-      syslog (LOG_INFO, "key value: %s", kvalue);
-      horus_key_by_master (key, key_len, x, y, kvalue, strlen (kvalue));
-      key_val2str (keybuf, sizeof (keybuf), key, *key_len);
-      syslog (LOG_INFO, "K(%d,%d) = %s", x, y, keybuf);
+      i--;
+      x = xstack[i];
+      y = ystack[i];
+
+      /* K_x,y = KH(Kp, x||y) */
+      block_key (tmp_k, &tmp_klen, tmp_kp, tmp_kplen, x, y);
+
+      /* Kp = K_x,y */
+      memcpy (tmp_kp, tmp_k, sizeof (tmp_k));
+      tmp_kplen = tmp_klen;
+
+      /* Kp = str(Kp) */
+      key_val2str (str_k, sizeof (str_k), tmp_kp, tmp_kplen);
+      memcpy (tmp_kp, str_k, sizeof (tmp_kp));
+      tmp_kplen = strlen (str_k);
+
+      if (horus_verbose)
+        printf ("K_%d,%d = %s\n", x, y, tmp_kp);
     }
-  else
-    {
-      sscanf (ktype, "%d,%d", &rkey_x, &rkey_y);
-      syslog (LOG_INFO, "key type: range: %d,%d", rkey_x, rkey_y);
-      syslog (LOG_INFO, "key value: %s", kvalue);
-      horus_key_from_to (key, key_len, x, y,
-                         kvalue, strlen (kvalue), rkey_x, rkey_y);
-      key_val2str (keybuf, sizeof (keybuf), key, *key_len);
-      syslog (LOG_INFO, "K(%d,%d) = %s", x, y, keybuf);
-    }
+
+  assert (x == kx && y == ky);
+
+  /* k = tmp_k */
+  memcpy (k, tmp_k, *klen);
+  *klen = tmp_klen;
+
+  return 0;
 }
+
+int
+horus_key_by_master (char *key, size_t *key_len, int x, int y,
+                     char *master, int master_len,
+                     unsigned int *kht_block_size)
+{
+  char k0[SHA_DIGEST_LENGTH * 2 + 1];
+  size_t k0len;
+  int xk0, yk0;
+  char str_k0[SHA_DIGEST_LENGTH * 2 + 1];
+  int tk, ty;
+  int branch;
+
+  if (horus_debug)
+    printf ("%s(): x = %d, y = %d\n", __func__, x, y);
+
+  tk = x;
+  ty = y;
+  while (tk > 0)
+    {
+      branch = kht_block_size[tk - 1] / kht_block_size[tk];
+      tk -= 1;
+      ty /= branch;
+    }
+
+  xk0 = tk;
+  yk0 = ty;
+  assert (xk0 == 0);
+
+  block_key (k0, &k0len, master, (size_t) master_len, xk0, yk0);
+
+  key_val2str (str_k0, sizeof (str_k0), k0, k0len);
+  memcpy (k0, str_k0, sizeof (k0));
+  k0len = strlen (str_k0);
+
+  horus_block_key (key, key_len, x, y, k0, k0len, xk0, yk0,
+                   kht_block_size);
+
+  return 0;
+}
+
 
 
 /** Scan key_store and look for entry of fd

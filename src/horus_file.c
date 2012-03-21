@@ -13,8 +13,9 @@ extern int opterr;
 extern int optreset;
 
 char *progname;
-int verbose = 0;
-int debug = 0;
+
+extern horus_debug;
+extern horus_verbose;
 
 const char *optstring = "vdh";
 const char *optusage = "\
@@ -87,7 +88,7 @@ horus_file_cmd_show (int fd, char *target)
   printf ("\n");
 
   printf ("%-24s\n", "  client range:");
-  if (debug)
+  if (horus_debug)
     {
       for (i = 0; i < HORUS_MAX_CLIENT_ENTRY; i++)
         {
@@ -192,7 +193,7 @@ horus_file_cmd_kht_block_sizes (int fd, int argc, char **argv)
 
       kht_block_sizes[i] = (unsigned int) nblock;
 
-      //if (debug)
+      //if (horus_debug)
         printf ("kht_block_sizes[%2d] = %10u (blks) "
                 "(%13llu bytes) (%lu branch)\n",
                 i, nblock, size, branch);
@@ -349,10 +350,10 @@ main (int argc, char **argv)
       switch (ch)
         {
         case 'd':
-          debug++;
+          horus_debug++;
           break;
         case 'v':
-          verbose++;
+          horus_verbose++;
           break;
         default:
           usage ();
@@ -378,7 +379,7 @@ main (int argc, char **argv)
       argv++;
     }
 
-  if (debug)
+  if (horus_debug)
     {
       if (target)
         printf ("target: %s\n", target);

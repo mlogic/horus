@@ -16,6 +16,9 @@
 #include "log.h"
 
 int debug = 0;
+int horus_debug = 0;
+int horus_verbose = 0;
+
 int is_init = 0;
 
 /* libhorus tracks files by file descriptor. */
