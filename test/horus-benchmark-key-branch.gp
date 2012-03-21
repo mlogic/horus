@@ -111,7 +111,7 @@ set rrange [ * : * ] noreverse nowriteback  # (currently [8.98847e+307:-8.98847e
 set trange [ * : * ] noreverse nowriteback  # (currently [-5.00000:5.00000] )
 set urange [ * : * ] noreverse nowriteback  # (currently [-10.0000:10.0000] )
 set vrange [ * : * ] noreverse nowriteback  # (currently [-10.0000:10.0000] )
-set xlabel "key hash tree depth (on fixed branch: 4)" 
+set xlabel "key hash tree branch (on fixed depth: 10)"
 set xlabel  offset character 0, 0, 0 font "" textcolor lt -1 norotate
 set x2label "" 
 set x2label  offset character 0, 0, 0 font "" textcolor lt -1 norotate
@@ -121,8 +121,8 @@ set ylabel "time taken to calculte all keys for 2GB files (secs)"
 set ylabel  offset character 0, 0, 0 font "" textcolor lt -1 rotate by -270
 set y2label "calculated keys per sec (K q/s)"
 set y2label  offset character 0, 0, 0 font "" textcolor lt -1 rotate by -270
-set yrange [ * : * ] noreverse nowriteback  # (currently [0.00000:25.0000] )
-set y2range [ * : * ] noreverse nowriteback
+set yrange [ 0 : 10 ] noreverse nowriteback  # (currently [0.00000:25.0000] )
+set y2range [ 0 : 100 ] noreverse nowriteback
 set zlabel "" 
 set zlabel  offset character 0, 0, 0 font "" textcolor lt -1 norotate
 set zrange [ * : * ] noreverse nowriteback  # (currently [-10.0000:10.0000] )
@@ -147,11 +147,11 @@ set fontpath
 set fit noerrorvariables
 GNUTERM = "aqua"
 set terminal aqua 0 title "Horus key calc benchmark" size 846,594 font "Times-Roman,14" noenhanced solid
-plot "horus-benchmark-key.data" using 2:11 w lp title "time to calc (left)", "horus-benchmark-key.data" using 2:($14/1000) axes x1y2 w lp title "K query IO/s (right)"
+plot "horus-benchmark-key-branch.data" using 4:11 w lp title "time to calc (left)", "horus-benchmark-key-branch.data" using 4:($14/1000) axes x1y2 w lp title "K query IO/s (right)"
 set terminal postscript eps "Helvetica" 24
-set output "horus-benchmark-key.eps"
+set output "horus-benchmark-key-branch.eps"
 replot
 set terminal png
-set output "horus-benchmark-key.png"
+set output "horus-benchmark-key-branch.png"
 replot
 #    EOF

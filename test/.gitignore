@@ -6,5 +6,11 @@ benchmark_key_utils
 FILENAME
 horus-benchmark-key.log
 horus-benchmark-key.data
-horus-benchmark-key.eps
 horus-benchmark-key.png
+horus-benchmark-key.eps
+horus-benchmark-key.pdf
+horus-benchmark-key-branch.log
+horus-benchmark-key-branch.data
+horus-benchmark-key-branch.png
+horus-benchmark-key-branch.eps
+horus-benchmark-key-branch.pdf
