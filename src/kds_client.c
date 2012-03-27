@@ -1,63 +1,129 @@
 #include <horus.h>
-
-#include <log.h>
-#include <shell.h>
-#include <shell_history.h>
-#include <command.h>
-#include <command_shell.h>
-#include <thread.h>
-#include <network.h>
-#include <terminal.h>
-#include <openssl.h>
-
-#include <horus_attr.h>
-#include <horus_key.h>
-
 #include <kds.h>
+#include <assert.h>
+#include <benchmark.h>
+#include <getopt.h>
+
+#define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
+char *progname;
+extern char *optarg;
+extern int optind;
+extern int optopt;
+extern int opterr;
+extern int optreset;
+extern horus_debug;
+
+const char *optstring = "bdh";
+const char *optusage = "\
+-b, --benchmark  Turn on benchmarking\n\
+-d, --debug      Turn on debugging mode\n\
+-h, --help       Display this help\n\
+";
+
+const struct option longopts[] = {
+  {"benchmark", no_argument, NULL, 'b'},
+  {"debug", no_argument, NULL, 'd'},
+  {"help", no_argument, NULL, 'h'},
+  {NULL, 0, NULL, 0}
+};
+
+
+void
+usage ()
+{
+  printf ("Usage : %s [OPTION...] KDS_IP filename x y\n", progname);
+  printf ("\n");
+  printf ("options are \n%s\n", optusage);
+  printf ("Report bugs to %s\n", HORUS_BUG_ADDRESS);
+  exit (0);
+}
+
 
 int
-main (int argc, char *argv[])
+client_sendrecv (int fd, struct sockaddr_in srv_addr,
+                 const key_request_packet * kreq, key_response_packet * kresp)
+{
+  int ret = -1, addrlen;
+
+  assert ((kreq != NULL) && (kresp != NULL));
+  ret = sendto (fd, kreq, sizeof (key_request_packet), 0,
+                (struct sockaddr *) &srv_addr, sizeof (srv_addr));
+  assert (ret == sizeof (key_request_packet));
+  do
+    {
+      addrlen = sizeof (srv_addr);
+      ret = recvfrom (fd, kresp, sizeof (key_request_packet), 0,
+                      (struct sockaddr *) &srv_addr, &addrlen);
+    }
+  while (ret <= 0);
+  assert (ret == sizeof (key_response_packet));
+  return 0;
+}
+
+int
+main (int argc, char **argv)
 {
   int fd;
-  int ret, fromlen, slen, rlen;
+  int ret, ch, benchmark = 0, i;
   struct sockaddr_in srv_addr;
-  struct sockaddr_storage from;
-  char rbuf[MAX_RECV_LEN];
-  char sbuf[MAX_SEND_LEN];
-  short ack;
-  struct key_request kr, kr1;
+  struct key_request_packet kreq;
+  struct key_response_packet kresp;
 
-  if (argc != 2)
+  progname = (1 ? "kds_client" : argv[0]);
+  while ((ch = getopt_long (argc, argv, optstring, longopts, NULL)) != -1)
     {
-      fprintf (stderr, "Usage: %s kds_ip \n", argv[0]);
-      exit (1);
+      switch (ch)
+        {
+        case 'b':
+          benchmark++;
+          break;
+        case 'd':
+          horus_debug++;
+          break;
+        default:
+          usage ();
+          break;
+        }
     }
+  argc -= optind;
+  argv += optind;
+
+  if (argc != 4)
+    usage ();
+
+  strcpy (kreq.filename, argv[1]);
+  kreq.x = atoi (argv[2]);
+  kreq.y = atoi (argv[3]);
 
   memset (&srv_addr, 0, sizeof (srv_addr));
-  srv_addr.sin_family = AF_INET;
+  srv_addr.sin_family = PF_INET;
   srv_addr.sin_port = htons (HORUS_KDS_SERVER_PORT);
-  inet_pton (AF_INET, argv[1], &srv_addr.sin_addr);
+  inet_pton (PF_INET, argv[0], &srv_addr.sin_addr);
 
-  fd = socket (AF_INET, SOCK_DGRAM, 0);
+  if (benchmark)
+    start_clock ();
+  fd = socket (PF_INET, SOCK_DGRAM, 0);
 
   if (fd < 0)
     {
       fprintf (stderr, "Unable to open socket!\n");
       exit (1);
     }
-  /* Just some test code */
-  kr.ranges = malloc (sizeof (range) * 2);
-  kr.ranges[0].x = kr.ranges[1].y = 123;
-  kr.ranges[1].x = kr.ranges[0].y = 456;
 
-  kr.ranges_len = 2;
-  kr.filename = strdup ("good morning");
-  kr.filename_len = strlen (kr.filename) + 1;
-
-  slen = kr2str (&kr, sbuf, MAX_SEND_LEN);
-
-  rlen = MAX_RECV_LEN;
-  client_sendrecv (fd, srv_addr, sbuf, rbuf, slen, &rlen);
-
-
+  client_sendrecv (fd, srv_addr, &kreq, &kresp);
+  if (kresp.err == 0)
+    {
+      printf ("key = %s\n", print_key (kresp.key));
+    }
+  else
+    {
+      fprintf (stderr, "err = %d\n", kresp.err);
+    }
+  if (benchmark)
+    {
+      end_clock ();
+      printf ("time = ");
+      print_last_clock_diff ();
+    }
+  printf ("\n");
 }

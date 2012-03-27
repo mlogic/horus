@@ -19,6 +19,9 @@
 #ifndef _HORUS_BENCHMARK_H
 #define _HORUS_BENCHMARK_H
 
+static inline struct timespec
+diff (struct timespec start, struct timespec end);
+
 #ifdef __APPLE__
 #  include <CoreServices/CoreServices.h>
 #  include <mach/mach.h>
@@ -32,8 +35,46 @@
 #  include <sys/times.h>
 #  include <stdio.h>
 #  include <time.h>
-   struct timespec st_hires_time, en_hires_time;
+  struct timespec st_hires_time, en_hires_time;
+
 #endif /* __APPLE__ */
+
+struct horus_clock
+{
+  struct timespec start;
+  struct timespec end;
+};
+
+inline void start_horus_clock(struct horus_clock *p)
+{
+#ifdef __APPLE__
+  ;
+#else
+  clock_gettime (CLOCK_MONOTONIC, &p->start);
+#endif
+};
+
+inline void stop_horus_clock(struct horus_clock *p)
+{
+#ifdef __APPLE__
+  ;
+#else
+  clock_gettime (CLOCK_MONOTONIC, &p->end);
+#endif
+};
+
+void
+print_horus_clock_time (struct horus_clock *p)
+{
+#ifdef __APPLE__
+  ;
+#else
+  struct timespec result;
+  result = diff (p->start, p->end);
+  printf ("%ld,%ld", result.tv_sec, result.tv_nsec);
+#endif
+}
+
 
 inline void
 start_clock ()
@@ -45,7 +86,7 @@ start_clock ()
 #endif /* __APPLE__ */
 }
 
-inline static struct timespec
+static inline struct timespec
 diff (struct timespec start, struct timespec end)
 {
   struct timespec temp;

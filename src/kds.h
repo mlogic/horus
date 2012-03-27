@@ -1,36 +1,29 @@
 
-#define HORUS_KDS_SERVER_PORT 6666
-#define MAX_RECV_LEN 1024
-#define MAX_SEND_LEN 1024
-#define THREAD_MAX 16
+#define HORUS_KDS_SERVER_PORT   6666
+#define HORUS_THREAD_MAX        16
+#define HORUS_MAX_KHT_DEPTH     16
+#define HORUS_MAX_KEY_LEN       41
+#define HORUS_MAX_FILENAME_LEN  256
 
-#define KDS_COMMAND_KEYREQ 0x1
-
-struct range
+struct key_request_packet
 {
-  int x;
-  int y;
+  u_int32_t x;
+  u_int32_t y;
+  char filename[HORUS_MAX_FILENAME_LEN];
 };
 
-typedef struct range range;
+typedef struct key_request_packet key_request_packet;
 
-struct key_request
+struct key_response_packet
 {
-  int buf_len;
-  int ranges_len;
-  int filename_len;
-  range *ranges;
-  char *filename;
+  u_int32_t x;
+  u_int32_t y;
+  char key[HORUS_MAX_KEY_LEN];
+  u_int32_t kht_block_size[HORUS_MAX_KHT_DEPTH];
+  u_int32_t err;
 };
-
+typedef struct key_response_packet key_response_packet;
 
 int
-client_sendrecv (int fd, struct sockaddr_in srv_addr, char *sbuf, char *rbuf,
-                 const int slen, int *rlen_p);
-
-
-/* serializing stuct key_request to a char string */
-
-int kr2str (struct key_request *kr, char *buf, int buf_size);
-
-int str2kr (struct key_request *kr, char *buf, int buf_size);
+client_sendrecv (int fd, struct sockaddr_in srv_addr,
+                 const key_request_packet * kreq, key_response_packet * kresp);

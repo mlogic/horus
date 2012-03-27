@@ -19,8 +19,7 @@
 #include <horus_attr.h>
 
 inline ssize_t
-_fgetxattr (int fd, const char *name,
-	    void *value, size_t size)
+_fgetxattr (int fd, const char *name, void *value, size_t size)
 {
 #ifdef __APPLE__
   return fgetxattr (fd, name, value, size, 0, 0);
@@ -30,8 +29,7 @@ _fgetxattr (int fd, const char *name,
 }
 
 inline ssize_t
-_fsetxattr (int fd, const char *name,
-	    void *value, size_t size, int flags)
+_fsetxattr (int fd, const char *name, void *value, size_t size, int flags)
 {
 #ifdef __APPLE__
   return fsetxattr (fd, name, value, size, 0, 0);
@@ -41,8 +39,7 @@ _fsetxattr (int fd, const char *name,
 }
 
 inline ssize_t
-_lgetxattr(const char *path, const char *name,
-	   void *value, size_t size)
+_lgetxattr (const char *path, const char *name, void *value, size_t size)
 {
 #ifdef __APPLE__
   return getxattr (path, name, value, size, 0, XATTR_NOFOLLOW);
@@ -105,9 +102,9 @@ horus_ea_config_masterkey (char *path, int in_fd, char *key)
       horus_ea_config_init (&config);
     }
 
-  strncpy ((char*)config.master_key, key, strlen(key));
+  strncpy ((char *) config.master_key, key, strlen (key));
 
- //set_attr:
+  //set_attr:
   res =
     _fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
   if (res == -1)
@@ -155,7 +152,7 @@ horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
 
 
 
- //set_attr:
+  //set_attr:
   res =
     _fsetxattr (fd, HORUS_EA_NAME, (unsigned char *) &config, HORUS_EA_SIZE, 0);
   if (res == -1)
@@ -226,7 +223,7 @@ horus_get_fattr_masterkey (int fd, char *buf, int bufsiz)
   if (res == -1)
     return -errno;
 
-  len = strlen ((char*)config.master_key);
+  len = strlen ((char *) config.master_key);
   if (len + 1 > bufsiz)
     return -ENOSPC;
 
@@ -239,10 +236,12 @@ horus_get_fattr_masterkey (int fd, char *buf, int bufsiz)
 }
 
 
-int horus_get_fattr_masterkey_config (struct horus_ea_config *config,
-                                      char *buf, int bufsiz)
+int
+horus_get_fattr_masterkey_config (struct horus_ea_config *config,
+                                  char *buf, int bufsiz)
 {
   int len;
+
   len = strlen (config->master_key);
   if (len + 1 > bufsiz)
     return -ENOSPC;
@@ -298,13 +297,12 @@ horus_get_fattr_client (int fd, struct in_addr *client,
 }
 
 int
-horus_get_fattr(int fd, struct horus_ea_config *config)
+horus_get_fattr (int fd, struct horus_ea_config *config)
 {
 
   int res;
 
-  res =
-    _fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) config, HORUS_EA_SIZE);
+  res = _fgetxattr (fd, HORUS_EA_NAME, (unsigned char *) config, HORUS_EA_SIZE);
 
   if (res == -1)
     return -errno;
@@ -314,7 +312,10 @@ horus_get_fattr(int fd, struct horus_ea_config *config)
 
 
 
-int horus_get_fattr_config_client (struct horus_ea_config *config, struct in_addr *client, u_int32_t *start, u_int32_t *end)
+int
+horus_get_fattr_config_client (struct horus_ea_config *config,
+                               struct in_addr *client, u_int32_t * start,
+                               u_int32_t * end)
 {
 
   int i, count, found = 0;
@@ -345,11 +346,11 @@ int
 horus_get_file_config (int fd, struct horus_file_config *config)
 {
   int ret;
+
   ret = _fgetxattr (fd, HORUS_FATTR_NAME, (void *) config,
                     sizeof (struct horus_file_config));
   if (ret < 0)
-    log_error ("fgetxattr() failed in %s: %s",
-               __FUNCTION__, strerror (errno));
+    log_error ("fgetxattr() failed in %s: %s", __FUNCTION__, strerror (errno));
   return ret;
 }
 
@@ -357,11 +358,11 @@ int
 horus_set_file_config (int fd, struct horus_file_config *config)
 {
   int ret;
+
   ret = _fsetxattr (fd, HORUS_FATTR_NAME, (void *) config,
                     sizeof (struct horus_file_config), 0);
   if (ret < 0)
-    log_error ("fsetxattr() failed in %s: %s",
-               __FUNCTION__, strerror (errno));
+    log_error ("fsetxattr() failed in %s: %s", __FUNCTION__, strerror (errno));
   return ret;
 }
 
@@ -370,6 +371,7 @@ horus_get_master_key (int fd, char *buf, int bufsize)
 {
   int ret;
   struct horus_file_config c;
+
   ret = horus_get_file_config (fd, &c);
   if (ret < 0)
     return ret;
@@ -382,6 +384,7 @@ horus_set_master_key (int fd, char *buf)
 {
   int ret;
   struct horus_file_config c;
+
   ret = horus_get_file_config (fd, &c);
   if (ret < 0)
     memset (&c, 0, sizeof (struct horus_file_config));
@@ -395,6 +398,7 @@ horus_set_kht_block_size (int fd, int level, unsigned int size)
 {
   int ret;
   struct horus_file_config c;
+
   ret = horus_get_file_config (fd, &c);
   if (ret < 0)
     memset (&c, 0, sizeof (struct horus_file_config));
@@ -411,6 +415,7 @@ horus_add_client_range (int fd, struct in_addr *prefix, int prefixlen,
   int i;
   struct horus_file_config c;
   struct horus_client_range *match;
+
   ret = horus_get_file_config (fd, &c);
   if (ret < 0)
     memset (&c, 0, sizeof (struct horus_file_config));
@@ -419,7 +424,8 @@ horus_add_client_range (int fd, struct in_addr *prefix, int prefixlen,
   for (i = 0; i < HORUS_MAX_CLIENT_ENTRY; i++)
     {
       struct horus_client_range *p = &c.client_range[i];
-      if (IS_HORUS_CLIENT_RANGE_EMPTY(p))
+
+      if (IS_HORUS_CLIENT_RANGE_EMPTY (p))
         {
           match = p;
           break;
@@ -437,11 +443,41 @@ horus_add_client_range (int fd, struct in_addr *prefix, int prefixlen,
 }
 
 int
+horus_client_range_from_config (struct horus_file_config *c,
+                                struct in_addr *addr, unsigned int *sblock,
+                                unsigned int *eblock)
+{
+  int ret;
+  int i;
+  struct horus_client_range *match = NULL;
+
+  for (i = 0; i < HORUS_MAX_CLIENT_ENTRY; i++)
+    {
+      struct horus_client_range *p = &c->client_range[i];
+
+      if (!IS_HORUS_CLIENT_RANGE_EMPTY (p) && p->prefix.s_addr == addr->s_addr)
+        {
+          match = p;
+          break;
+        }
+    }
+  if (match)
+    {
+      *sblock = match->start;
+      *eblock = match->end;
+      return 0;
+    }
+  else
+    return ENOENT;
+}
+
+int
 horus_clear_client_range (int fd)
 {
   int ret;
   int i;
   struct horus_file_config c;
+
   ret = horus_get_file_config (fd, &c);
   if (ret < 0)
     memset (&c, 0, sizeof (struct horus_file_config));
@@ -455,11 +491,11 @@ int
 horus_delete_file_config (int fd)
 {
   int ret;
+
   ret = _fremovexattr (fd, HORUS_FATTR_NAME, 0);
   if (ret < 0)
-    log_error ("fsetxattr() failed in %s: %s",
-               __FUNCTION__, strerror (errno));
+    log_error ("fsetxattr() failed in %s: %s", __FUNCTION__, strerror (errno));
   return ret;
 }
-/* End of NEW CODE */
 
+/* End of NEW CODE */

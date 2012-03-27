@@ -115,20 +115,19 @@ horus_set_fattr_client (int fd, struct in_addr *client,
 int
 horus_get_fattr_client (int fd, struct in_addr *client,
                         u_int32_t * start, u_int32_t * end);
-int
-horus_ea_config_show (char *path);
+int horus_ea_config_show (char *path);
 
 int
 horus_ea_config_add_entry (char *path, int in_fd, struct in_addr ip,
-                                   uint32_t start_block, uint32_t end_block);
+                           uint32_t start_block, uint32_t end_block);
 
-int
-horus_ea_config_masterkey (char *path, int in_fd, char *key);
+int horus_ea_config_masterkey (char *path, int in_fd, char *key);
 
-int
-horus_get_fattr(int fd, struct horus_ea_config *config);
+int horus_get_fattr (int fd, struct horus_ea_config *config);
 
-int horus_get_fattr_config_client (struct horus_ea_config *config, struct in_addr *client, u_int32_t *start, u_int32_t *end);
+int horus_get_fattr_config_client (struct horus_ea_config *config,
+                                   struct in_addr *client, u_int32_t * start,
+                                   u_int32_t * end);
 
 int horus_get_fattr_masterkey_config (struct horus_ea_config *config,
                                       char *buf, int bufsiz);
@@ -140,4 +139,7 @@ int horus_get_master_key (int fd, char *buf, int bufsize);
 int horus_set_master_key (int fd, char *buf);
 int horus_set_kht_block_size (int fd, int level, unsigned int size);
 
+int horus_client_range_from_config (struct horus_file_config *c,
+                                    struct in_addr *addr,
+                                    unsigned int *sblock, unsigned int *eblock);
 #endif
