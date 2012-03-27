@@ -1,14 +1,19 @@
-
-- Do not use bcopy(). use memset ('0') for portability.
-- Do not use u8.
-- use assert() rather than perror & abort.
-- find_key_by_fd is completely wrong... (must p=p->next; in the loop)
-- do not use label and goto.
-
-- <openssl/sha.h> is not necessary in lib/horus_key.c since <horus.h>
-  will include it depending upon the result in config.h
-- do not use malloc, vectorx, or any other heavy task in lib/horus_key.c
-
-
 - the method for debugging: sh ./libtool --mode=execute gdb horus-file
+
+- struct key_request still includes pointers. Is it not used anymore ?
+  In order to read/write a struct to the network, we need to eliminate
+  pointers.
+- Indicating the IP address as "IP" is wrong. e.g.: kds_ip -> kds_ip_addr.
+  if in usage message, A.B.C.D will be better.
+- src/kds.c is gone ? put it back.
+- again, kr2str() is not necessary. we don't want ascii string to go to
+  network. just sending integers with network byteorder (in the struct)
+  will be okay. The current method of: 1) setting struct, 2) converting to
+  string/ascii, and 3) sendto() is redundant.
+  Make it like 1) fill the struct, and 2) sendto().
+- use getopt argument handling like src/horus_file.c and src/horus_key.c
+
+- We need to produce a code such that we can benchmark the query/sec of
+  the server as soon as possible, at least until the weekend.
+
 
