@@ -1,6 +1,0 @@
-
-unsetenv LD_PRELOAD
-
-unsetenv DYLD_INSERT_LIBRARIES
-unsetenv DYLD_FORCE_FLAT_NAMESPACE
-

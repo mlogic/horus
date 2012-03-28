@@ -1,6 +1,0 @@
-
-export LD_PRELOAD=@libdir@/libhorus.so
-
-export DYLD_INSERT_LIBRARIES=@libdir@/libhorus.dylib
-export DYLD_FORCE_FLAT_NAMESPACE=YES
-
