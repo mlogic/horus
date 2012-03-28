@@ -10,11 +10,11 @@ kds_rpc_client_SOURCES = kds_rpc_client.c kds_rpc_clnt.c kds_rpc_xdr.c
 kds_rpc_client_LDADD = ../lib/libhorus.la
 
 kds_server_SOURCES = kds_server.c
-kds_server_LDADD = ../lib/libhorus.la @PTHREAD_LIBS@ -lrt
+kds_server_LDADD = ../lib/libhorus.la @PTHREAD_LIBS@
 
 
 kds_client_SOURCES = kds_client.c
-kds_client_LDADD = ../lib/libhorus.la -lrt
+kds_client_LDADD = ../lib/libhorus.la
 
 test_shell_SOURCES = test_shell.c
 test_shell_LDADD = ../lib/libhorus.la

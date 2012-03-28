@@ -1,19 +1,9 @@
 - the method for debugging: sh ./libtool --mode=execute gdb horus-file
 
-- struct key_request still includes pointers. Is it not used anymore ?
-  In order to read/write a struct to the network, we need to eliminate
-  pointers.
-- Indicating the IP address as "IP" is wrong. e.g.: kds_ip -> kds_ip_addr.
-  if in usage message, A.B.C.D will be better.
-- src/kds.c is gone ? put it back.
-- again, kr2str() is not necessary. we don't want ascii string to go to
-  network. just sending integers with network byteorder (in the struct)
-  will be okay. The current method of: 1) setting struct, 2) converting to
-  string/ascii, and 3) sendto() is redundant.
-  Make it like 1) fill the struct, and 2) sendto().
-- use getopt argument handling like src/horus_file.c and src/horus_key.c
-
-- We need to produce a code such that we can benchmark the query/sec of
-  the server as soon as possible, at least until the weekend.
-
+- server-side timing measure is not necessary, I guess.
+  we saturate the server by using multiple client.
+  Each kds_client benchmarks the q/s for him.
+  The number of clients are increased, like, 3,4,5,6..
+  At some point the q/s will start to degrade.
+  we can infer from them how much q/s the server has.
 

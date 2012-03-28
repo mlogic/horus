@@ -49,8 +49,14 @@ fi
 
 AC_CANONICAL_HOST
 case $host in
-    *-apple-*) apple=true   ;;
-    *-linux-*) apple=false   ;;
+    *-apple-*)
+      apple=true
+      LDFLAGS="$LDFLAGS -framework CoreServices"
+      ;;
+    *-linux-*)
+      LDFLAGS="$LDFLAGS -lrt"
+      apple=false
+      ;;
 esac
 AM_CONDITIONAL([APPLE], [test x$apple = xtrue])
 

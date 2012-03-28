@@ -117,7 +117,8 @@ main (int argc, char **argv)
     }
   else
     {
-      fprintf (stderr, "err = %d\n", kresp.err);
+      fprintf (stderr, "err = %d: %s\n",
+               kresp.err, strerror (kresp.err));
     }
   if (benchmark)
     {
