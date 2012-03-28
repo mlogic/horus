@@ -1,7 +1,7 @@
 #include <horus.h>
 #include <horus_attr.h>
 #include <horus_key.h>
-#include "kds.h"
+#include <kds_protocol.h>
 #include <getopt.h>
 #include <benchmark.h>
 
@@ -16,20 +16,23 @@ extern int opterr;
 extern int optreset;
 extern horus_debug;
 
-const char *optstring = "bdh";
+extern horus_debug;
+extern horus_verbose;
+
+const char *optstring = "bvdh";
 const char *optusage = "\
--b, --benchmark  Turn on benchmarking\n\
--d, --debug      Turn on debugging mode\n\
--h, --help       Display this help\n\
+-b, --benchmark   Turn on benchmarking\n\
+-v, --verbose     Turn on verbose mode\n\
+-d, --debug       Turn on debugging mode\n\
+-h, --help        Display this help and exit\n\
 ";
-
 const struct option longopts[] = {
-  {"benchmark", no_argument, NULL, 'b'},
-  {"debug", no_argument, NULL, 'd'},
-  {"help", no_argument, NULL, 'h'},
-  {NULL, 0, NULL, 0}
+  { "benchmark",  no_argument,        NULL, 'b' },
+  { "verbose",    no_argument,        NULL, 'v' },
+  { "debug",      no_argument,        NULL, 'd' },
+  { "help",       no_argument,        NULL, 'h' },
+  { NULL,         0,                  NULL,  0  }
 };
-
 
 void
 usage ()
@@ -41,10 +44,9 @@ usage ()
   exit (0);
 }
 
-
-
 static int num_threads = 0;
 pthread_mutex_t kds_client_th = PTHREAD_MUTEX_INITIALIZER;
+
 static void
 increment_thread_count (void)
 {
@@ -160,30 +162,40 @@ handle_kds_client (void *p)
 
   if (benchmark)
     start_horus_clock (&clock_total);
+
   pthread_detach (pthread_self ());
   increment_thread_count ();
+
+  if (horus_verbose)
+    printf ("thread[%d]: %s\n", thread_count (), __func__);
+
   fd = *(int *) p;
   client_len = sizeof (client);
   ret = recvfrom (fd, &kreq, sizeof (kreq), 0, (struct sockaddr *) &client,
                   &client_len);
   if (ret <= 0)
     {
+      if (horus_verbose)
+        printf ("recvfrom() failed: %s\n", strerror (errno));
+
       decrement_thread_count ();
       pthread_exit (NULL);
     }
   assert (ret == sizeof (key_request_packet));
 
-/* Calculate and send key to client */
-
   if (benchmark)
     start_horus_clock (&clock_key);
+
+  /* Calculate the key for the client */
   kds_get_client_key (&client.sin_addr, &kreq, &kresp);
+
   if (benchmark)
     stop_horus_clock (&clock_key);
 
+  /* Send the key to the client */
   sendto (fd, &kresp, sizeof (kresp), 0, (struct sockaddr *) &client,
           client_len);
-  decrement_thread_count ();
+
   if (benchmark)
     {
       stop_horus_clock (&clock_total);
@@ -193,6 +205,10 @@ handle_kds_client (void *p)
       print_horus_clock_time (&clock_total);
       printf ("\n");
     }
+
+  /* XXX decrement may better be done in the parent thread
+     that is watchdogging. */
+  decrement_thread_count ();
   pthread_exit (NULL);
 }
 
@@ -212,6 +228,9 @@ main (int argc, char **argv)
         case 'b':
           benchmark++;
           break;
+        case 'v':
+          horus_verbose++;
+          break;
         case 'd':
           horus_debug++;
           break;
@@ -226,19 +245,26 @@ main (int argc, char **argv)
   fd = server_socket (PF_INET, SOCK_DGRAM,
                       HORUS_KDS_SERVER_PORT, "kds_server_udp");
   assert (fd >= 0);
-  FD_ZERO (&fds);
-  FD_SET (fd, &fds);
-  fcntl (fd, F_SETFL, O_NONBLOCK);
+
   printf ("KDS started!\n");
+
   while (1)
     {
+      FD_ZERO (&fds);
+      FD_SET (fd, &fds);
+
       ret = select (fd + 1, &fds, NULL, NULL, NULL);
       assert (ret >= 0);
-      if (thread_count () < HORUS_THREAD_MAX && FD_ISSET (fd, &fds))
+
+      if (FD_ISSET (fd, &fds))
         {
-          pthread_create (&th[thread_count ()], NULL, handle_kds_client,
-                          (void *) &fd);
+          /* XXX th[] might shift incorrectly. */
+          if (thread_count () < HORUS_THREAD_MAX)
+            pthread_create (&th[thread_count ()], NULL,
+                            handle_kds_client, (void *) &fd);
         }
     }
+
   return 0;
 }
+

@@ -8,6 +8,10 @@
 #include <limits.h>
 #include "timeval.h"
 
+#define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
+char *progname;
+int benchmark = 0;
+
 extern char *optarg;
 extern int optind;
 extern int optopt;
@@ -16,8 +20,6 @@ extern int optreset;
 
 extern horus_debug;
 extern horus_verbose;
-
-char *progname;
 
 const char *optstring = "vdhx:y:b";
 const char *optusage = "\
@@ -37,8 +39,6 @@ const struct option longopts[] = {
   { "benchmark",  no_argument,        NULL, 'b' },
   { NULL,         0,                  NULL,  0  }
 };
-
-#define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
 
 void
 usage ()
@@ -163,7 +163,6 @@ main (int argc, char **argv)
   char *target, *cmd;
   unsigned long long offset;
   struct horus_file_config c;
-  int benchmark = 0;
 
   int i, ret;
   int x, y;

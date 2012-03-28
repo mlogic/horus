@@ -1,6 +1,6 @@
 #include <horus.h>
 #include <horus_key.h>
-#include <kds.h>
+#include <kds_protocol.h>
 #include <assert.h>
 #include <benchmark.h>
 #include <getopt.h>
