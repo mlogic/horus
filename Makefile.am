@@ -1,5 +1,5 @@
 
-SUBDIRS = lib src etc horusfs test
+SUBDIRS = lib src test
 
 # AM_CPPFLAGS = -I$(top_srcdir)/lib @PTHREAD_CFLAGS@
 
