@@ -8,8 +8,6 @@ horus-key
 horus-kds
 horus-file
 
-kds_rpc_server
-kds_rpc_client
 kds_server
 kds_client
 
