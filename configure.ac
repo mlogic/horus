@@ -41,6 +41,7 @@ AC_ARG_ENABLE([debug],
         *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
      esac],[debug=false])
 #CFLAGS="$CFLAGS -std=gnu99 -Wall -D_FILE_OFFSET_BITS=64"
+CFLAGS="$CFLAGS -Wall"
 if test x$debug = xtrue; then
    CFLAGS="$CFLAGS -g -O0"
 else

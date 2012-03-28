@@ -245,6 +245,18 @@ horus_key_by_master (char *key, size_t *key_len, int x, int y,
   if (horus_debug)
     printf ("%s(): x = %d, y = %d\n", __func__, x, y);
 
+  if (x >= HORUS_MAX_KHT_DEPTH)
+    {
+      printf ("%s(): x: out of range: %d\n", __func__, x);
+      return -1;
+    }
+
+  if (kht_block_size[x] == 0)
+    {
+      printf ("%s(): zero block size level: x: %d\n", __func__, x);
+      return -1;
+    }
+
   tk = x;
   ty = y;
   while (tk > 0)

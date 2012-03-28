@@ -443,19 +443,18 @@ horus_add_client_range (int fd, struct in_addr *prefix, int prefixlen,
 }
 
 int
-horus_client_range_from_config (struct horus_file_config *c,
-                                struct in_addr *addr, unsigned int *sblock,
-                                unsigned int *eblock)
+horus_get_client_range (struct horus_file_config *c, struct in_addr *addr,
+                        unsigned int *sblock, unsigned int *eblock)
 {
   int ret;
   int i;
-  struct horus_client_range *match = NULL;
+  struct horus_client_range *p, *match = NULL;
 
   for (i = 0; i < HORUS_MAX_CLIENT_ENTRY; i++)
     {
-      struct horus_client_range *p = &c->client_range[i];
-
-      if (!IS_HORUS_CLIENT_RANGE_EMPTY (p) && p->prefix.s_addr == addr->s_addr)
+      p = &c->client_range[i];
+      if (! IS_HORUS_CLIENT_RANGE_EMPTY (p) &&
+          p->prefix.s_addr == addr->s_addr)
         {
           match = p;
           break;

@@ -1,4 +1,5 @@
 #include <horus.h>
+#include <horus_key.h>
 #include <kds.h>
 #include <assert.h>
 #include <benchmark.h>
@@ -92,8 +93,8 @@ main (int argc, char **argv)
     usage ();
 
   strcpy (kreq.filename, argv[1]);
-  kreq.x = atoi (argv[2]);
-  kreq.y = atoi (argv[3]);
+  kreq.x = htonl (atoi (argv[2]));
+  kreq.y = htonl (atoi (argv[3]));
 
   memset (&srv_addr, 0, sizeof (srv_addr));
   srv_addr.sin_family = PF_INET;
@@ -111,14 +112,15 @@ main (int argc, char **argv)
     }
 
   client_sendrecv (fd, srv_addr, &kreq, &kresp);
-  if (kresp.err == 0)
+  if (ntohl (kresp.err) == 0)
     {
-      printf ("key = %s\n", print_key (kresp.key));
+      printf ("key = %s\n", print_key (kresp.key, ntohl (kresp.key_len)));
     }
   else
     {
+      int kresperr = (int) ntohl (kresp.err);
       fprintf (stderr, "err = %d: %s\n",
-               kresp.err, strerror (kresp.err));
+               kresperr, strerror (kresperr));
     }
   if (benchmark)
     {

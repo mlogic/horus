@@ -73,52 +73,78 @@ thread_count (void)
 }
 
 static int
-kds_get_client_key (struct in_addr *client, key_request_packet * kreq,
-                    key_response_packet * kresp)
+kds_get_client_key (struct in_addr *client,
+                    key_request_packet *kreq,
+                    key_response_packet *kresp)
 {
   int fd, ret;
-  unsigned int client_allowed_sblock, client_allowed_eblock, start, end;
+  unsigned int sblock, eblock, start, end;
   unsigned int block_size_x;
   struct horus_file_config c;
   char key[HORUS_MAX_KEY_LEN];
   size_t key_len = HORUS_MAX_KEY_LEN;
+  u_int32_t kreqx, kreqy;
 
   fd = open (kreq->filename, O_RDONLY);
   if (fd < 0)
     {
-      kresp->err = errno;
+      kresp->err = htonl (errno);
       return 0;
     }
+
   ret = horus_get_file_config (fd, &c);
   if (ret < 0)
     {
-      kresp->err = ret;
+      kresp->err = htonl (ret);
       return 0;
     }
-  ret = horus_client_range_from_config (&c, client, &client_allowed_sblock,
-                                        &client_allowed_eblock);
+
+  ret = horus_get_client_range (&c, client, &sblock, &eblock);
   if (ret < 0)
     {
-      kresp->err = ret;
+      kresp->err = htonl (ret);
       return 0;
     }
-  start = (kreq->y * c.kht_block_size[kreq->x]);
-  end = ((kreq->y + 1) * c.kht_block_size[kreq->x]);
-  if ((start >= client_allowed_sblock) && (end <= client_allowed_eblock))
+
+  kreqx = (u_int32_t) ntohl (kreq->x);
+  kreqy = (u_int32_t) ntohl (kreq->y);
+
+  if (kreqx >= HORUS_MAX_KHT_DEPTH)
     {
-      horus_key_by_master (key, &key_len, kreq->x, kreq->y, c.master_key,
-                           strlen (c.master_key), c.kht_block_size);
-      memcpy (kresp->key, key, key_len);
-      kresp->x = kreq->x;
-      kresp->y = kreq->y;
-      memcpy (&kresp->kht_block_size, &c.kht_block_size,
-              sizeof (c.kht_block_size));
-      kresp->err = 0;
+      kresp->err = htonl (EINVAL);
+      return 0;
     }
-  else
+  if (c.kht_block_size[kreqx] == 0)
     {
-      kresp->err = EACCES;
+      kresp->err = htonl (EINVAL);
+      return 0;
     }
+
+  start = (kreqy * c.kht_block_size[kreqx]);
+  end = ((kreqy + 1) * c.kht_block_size[kreqx]);
+  if (! (sblock <= start && end <= eblock))
+    {
+      kresp->err = htonl (EACCES);
+      return 0;
+    }
+
+  ret = horus_key_by_master (key, &key_len, kreqx, kreqy,
+                             c.master_key, strlen (c.master_key),
+                             c.kht_block_size);
+  if (ret < 0)
+    {
+      kresp->err = htonl (EINVAL);
+      return 0;
+    }
+
+  memcpy (kresp->key, key, key_len);
+  kresp->key_len = htonl (key_len);
+  kresp->x = htonl (kreqx);
+  kresp->y = htonl (kreqy);
+  memcpy (&kresp->kht_block_size, &c.kht_block_size,
+          sizeof (c.kht_block_size));
+  kresp->err = htonl (0);
+
   return 0;
 }
 

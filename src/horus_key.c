@@ -53,7 +53,7 @@ usage ()
 void
 horus_key_calc_benchmark (struct horus_file_config *c, int argc, char **argv)
 {
-  int i;
+  int i, ret;
   char key[64];
   int key_len;
   unsigned long long x, y, nblocks;
@@ -138,9 +138,10 @@ horus_key_calc_benchmark (struct horus_file_config *c, int argc, char **argv)
   for (y = 0; y < nblocks; y++)
     {
       key_len = sizeof (key);
-      horus_key_by_master (key, &key_len, x, y,
-                           c->master_key, strlen (c->master_key),
-                           c->kht_block_size);
+      ret = horus_key_by_master (key, &key_len, x, y,
+                                 c->master_key, strlen (c->master_key),
+                                 c->kht_block_size);
+      assert (ret == 0);
     }
 
   gettimeofday (&end, NULL);
@@ -307,14 +308,15 @@ main (int argc, char **argv)
     printf ("calculate K%d,%d.\n", x, y);
 
   key_len = sizeof (key);
-  horus_key_by_master (key, &key_len, x, y,
-                       c.master_key, strlen (c.master_key),
-                       c.kht_block_size);
+  ret = horus_key_by_master (key, &key_len, x, y,
+                             c.master_key, strlen (c.master_key),
+                             c.kht_block_size);
 
-  printf ("K_%d,%d = %s(%d) [%llu-%llu]\n",
-    x, y, print_key (key, key_len), (int) key_len,
-    (unsigned long long) c.kht_block_size[x] * HORUS_BLOCK_SIZE * y,
-    (unsigned long long) c.kht_block_size[x] * HORUS_BLOCK_SIZE * (y + 1) - 1);
+  if (ret == 0)
+    printf ("K_%d,%d = %s(%d) [%llu-%llu]\n",
+      x, y, print_key (key, key_len), (int) key_len,
+      (unsigned long long) c.kht_block_size[x] * HORUS_BLOCK_SIZE * y,
+      (unsigned long long) c.kht_block_size[x] * HORUS_BLOCK_SIZE * (y + 1) - 1);
 
   close (fd);
 

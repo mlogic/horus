@@ -14,13 +14,15 @@ struct key_request_packet
 
 typedef struct key_request_packet key_request_packet;
 
+/* align things... */
 struct key_response_packet
 {
   u_int32_t x;
   u_int32_t y;
-  char key[HORUS_MAX_KEY_LEN];
-  u_int32_t kht_block_size[HORUS_MAX_KHT_DEPTH];
   u_int32_t err;
+  u_int32_t key_len;
+  u_int32_t kht_block_size[HORUS_MAX_KHT_DEPTH];
+  char key[HORUS_MAX_KEY_LEN];
 };
 typedef struct key_response_packet key_response_packet;
 
