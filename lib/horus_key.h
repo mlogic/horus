@@ -11,8 +11,8 @@
  * published by the Free Software Foundation.
  */
 
-#ifndef _HORUS_KEY_H
-#define _HORUS_KEY_H
+#ifndef _HORUS_KEY_H_
+#define _HORUS_KEY_H_
 
 #include <stdlib.h>
 #include "vectorx.h"
@@ -42,4 +42,9 @@ void *duplicate_key (const void *key, size_t key_len);
 
 struct _key_store_entry* find_key_by_fd (const int fd);
 
-#endif /* _HORUS_KEY_H */
+int
+horus_key_by_master (char *key, size_t *key_len, int x, int y,
+                     char *master, int master_len,
+                     unsigned int *kht_block_size);
+
+#endif /* _HORUS_KEY_H_ */

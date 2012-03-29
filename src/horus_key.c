@@ -18,10 +18,10 @@ extern int optopt;
 extern int opterr;
 extern int optreset;
 
-extern horus_debug;
-extern horus_verbose;
+extern int horus_debug;
+extern int horus_verbose;
 
-const char *optstring = "vdhx:y:b";
+const char *optstring = "bvdhx:y:";
 const char *optusage = "\
 -v, --verbose     Turn on verbose mode\n\
 -d, --debug       Turn on debugging mode\n\
@@ -31,12 +31,12 @@ const char *optusage = "\
 -b, --benchmark   Turn on benchmark mode: <depth> <branch> <blocksize> <filesize>\n\
 ";
 const struct option longopts[] = {
+  { "benchmark",  no_argument,        NULL, 'b' },
   { "verbose",    no_argument,        NULL, 'v' },
   { "debug",      no_argument,        NULL, 'd' },
   { "help",       no_argument,        NULL, 'h' },
   { "key-x",      required_argument,  NULL, 'x' },
   { "key-y",      required_argument,  NULL, 'y' },
-  { "benchmark",  no_argument,        NULL, 'b' },
   { NULL,         0,                  NULL,  0  }
 };
 
@@ -55,7 +55,7 @@ horus_key_calc_benchmark (struct horus_file_config *c, int argc, char **argv)
 {
   int i, ret;
   char key[64];
-  int key_len;
+  size_t key_len;
   unsigned long long x, y, nblocks;
   int depth = 0;
   int branch = 0;
@@ -160,7 +160,7 @@ main (int argc, char **argv)
 {
   int ch;
   int fd;
-  char *target, *cmd;
+  char *target;
   unsigned long long offset;
   struct horus_file_config c;
 
@@ -181,11 +181,14 @@ main (int argc, char **argv)
     {
       switch (ch)
         {
-        case 'd':
-          horus_debug++;
+        case 'b':
+          benchmark++;
           break;
         case 'v':
           horus_verbose++;
+          break;
+        case 'd':
+          horus_debug++;
           break;
         case 'x':
           strx = optarg;
@@ -194,9 +197,6 @@ main (int argc, char **argv)
         case 'y':
           stry = optarg;
           keyy = atoi (stry);
-          break;
-        case 'b':
-          benchmark++;
           break;
         default:
           usage ();

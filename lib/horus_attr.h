@@ -139,7 +139,7 @@ int horus_get_master_key (int fd, char *buf, int bufsize);
 int horus_set_master_key (int fd, char *buf);
 int horus_set_kht_block_size (int fd, int level, unsigned int size);
 
-int horus_client_range_from_config (struct horus_file_config *c,
-                                    struct in_addr *addr,
-                                    unsigned int *sblock, unsigned int *eblock);
+int horus_get_client_range (struct horus_file_config *c,
+                            struct in_addr *addr,
+                            unsigned int *sblock, unsigned int *eblock);
 #endif

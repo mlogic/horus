@@ -1,23 +1,24 @@
 #include <horus.h>
 #include <horus_attr.h>
 #include <horus_key.h>
+#include <network.h>
 #include <kds_protocol.h>
+#include <assert.h>
 #include <getopt.h>
 #include <benchmark.h>
 
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
 char *progname;
-int benchmark;
+int benchmark = 0;
 
 extern char *optarg;
 extern int optind;
 extern int optopt;
 extern int opterr;
 extern int optreset;
-extern horus_debug;
 
-extern horus_debug;
-extern horus_verbose;
+extern int horus_debug;
+extern int horus_verbose;
 
 const char *optstring = "bvdh";
 const char *optusage = "\
@@ -81,7 +82,6 @@ kds_get_client_key (struct in_addr *client,
 {
   int fd, ret;
   unsigned int sblock, eblock, start, end;
-  unsigned int block_size_x;
   struct horus_file_config c;
   char key[HORUS_MAX_KEY_LEN];
   size_t key_len = HORUS_MAX_KEY_LEN;
@@ -95,6 +95,7 @@ kds_get_client_key (struct in_addr *client,
     }
 
   ret = horus_get_file_config (fd, &c);
+  close (fd);
   if (ret < 0)
     {
       kresp->err = htonl (ret);
@@ -139,13 +140,14 @@ kds_get_client_key (struct in_addr *client,
       return 0;
     }
 
-  memcpy (kresp->key, key, key_len);
-  kresp->key_len = htonl (key_len);
   kresp->x = htonl (kreqx);
   kresp->y = htonl (kreqy);
+  memcpy (kresp->filename, kreq->filename, sizeof (kresp->filename));
+  kresp->err = htonl (0);
   memcpy (&kresp->kht_block_size, &c.kht_block_size,
           sizeof (c.kht_block_size));
-  kresp->err = htonl (0);
+  memcpy (kresp->key, key, key_len);
+  kresp->key_len = htonl (key_len);
 
   return 0;
 }
@@ -153,8 +155,9 @@ kds_get_client_key (struct in_addr *client,
 void *
 handle_kds_client (void *p)
 {
-  int fd, th_val;
-  int ret, client_len;
+  int fd;
+  int ret;
+  socklen_t client_len;
   struct sockaddr_in client;
   struct key_request_packet kreq;
   struct key_response_packet kresp;
@@ -170,7 +173,7 @@ handle_kds_client (void *p)
     printf ("thread[%d]: %s\n", thread_count (), __func__);
 
   fd = *(int *) p;
-  client_len = sizeof (client);
+  client_len = (socklen_t) sizeof (client);
   ret = recvfrom (fd, &kreq, sizeof (kreq), 0, (struct sockaddr *) &client,
                   &client_len);
   if (ret <= 0)
@@ -245,6 +248,9 @@ main (int argc, char **argv)
   fd = server_socket (PF_INET, SOCK_DGRAM,
                       HORUS_KDS_SERVER_PORT, "kds_server_udp");
   assert (fd >= 0);
+
+  /* To support spurious return from Linux select() */
+  fcntl (fd, F_SETFL, O_NONBLOCK);
 
   printf ("KDS started!\n");
 

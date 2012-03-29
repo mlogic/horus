@@ -14,8 +14,8 @@ extern int optreset;
 
 char *progname;
 
-extern horus_debug;
-extern horus_verbose;
+extern int horus_debug;
+extern int horus_verbose;
 
 const char *optstring = "vdh";
 const char *optusage = "\
