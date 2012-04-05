@@ -267,86 +267,6 @@ DEFINE_COMMAND (no_user_key,
   kdb_delete (request);
 }
 
-DEFINE_COMMAND (get_range_key,
-                "get-range-key FILEPATH X Y", "Get range key for a file\n")
-{
-  struct command_shell *csh = (struct command_shell *) context;
-  int fd = -1, i;
-  uint32_t start_block, end_block, x, y, range_size, blk, start,end;
-  int ret, key_len, parent_len;
-  char key[SHA_DIGEST_LENGTH], range[30], parent[30];
-  char master[30];
-  char *filename;
-  fprintf(stderr, "test this %s %s %s!!!\n", argv[1], argv[2],argv[3]);
-  if (argc < 3 )
-  {
-    shell_printf (csh->shell, "Too few arguments!");
-    shell_linefeed (csh->shell);
-    goto exit;
-  }
-
-  filename = argv[1];
-  x = atoi(argv[2]);
-  y = atoi(argv[3]);
-
-  fd = open (filename, O_RDONLY);
-  if (fd < 0)
-  {
-      shell_printf (csh->shell, "Unable to open %s!", argv[1]);
-      shell_linefeed (csh->shell);
-      goto exit;
-  }
-  else
-  {
-    ret = horus_get_fattr_client (fd, &(csh->shell->saddr.sin_addr),
-                                  &start_block, &end_block);
-    if (ret != 0)
-    {
-      shell_printf(csh->shell, "Range for %s not configured for client",
-                   filename);
-      shell_linefeed(csh->shell);
-      goto exit;
-    }
-
-
-    ret = horus_get_fattr_masterkey (fd, master, 30);
-    if (ret < 0)
-    {
-      shell_printf(csh->shell, "Unable to read master-key ret = %d!",ret);
-      shell_linefeed(csh->shell);
-      goto exit;
-    }
-    master[ret+1] = '\0';  /* ret actually has length of master-key */
-
-
-    /* Convert x,y into start-block  and end-block  number */
-    // FIXME use horus_get_block_size() and horus_get_key()
-    /* start = (y * block_size[x]/MIN_CHUNK_SIZE); */
-    /* end = ((y+1) * block_size[x]/MIN_CHUNK_SIZE); */
-
-    /* if ((start >=start_block) && (end<=end_block)) */
-    /* { */
-    /*       snprintf (parent, sizeof (parent), "%s", master); */
-    /*       parent_len = strlen (master); */
-    /*       ret = horus_key_by_master (key, &key_len, x, y, parent, parent_len); */
-    /*       if (ret == 0) */
-    /*         shell_printf (csh->shell, "%s", print_key (key, key_len)); */
-    /*       else */
-    /*         shell_printf (csh->shell, "Error: horus_key_by_master error %d", */
-    /*                       ret); */
-    /*       shell_linefeed (csh->shell); */
-    /* } */
-    /* else */
-    /* { */
-    /*    shell_printf(csh->shell, "Access denied!"); */
-    /*    shell_linefeed(csh->shell); */
-    /* } */
-  }
-exit:
-  if (fd > 0)
-    close (fd);
-}
-
 void
 horus_kds_install_commands (struct command_set *cmdset)
 {
@@ -354,7 +274,6 @@ horus_kds_install_commands (struct command_set *cmdset)
   INSTALL_COMMAND (cmdset, show_user_key);
   INSTALL_COMMAND (cmdset, user_key);
   INSTALL_COMMAND (cmdset, no_user_key);
-  INSTALL_COMMAND (cmdset, get_range_key);
 }
 
 int

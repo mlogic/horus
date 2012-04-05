@@ -105,7 +105,9 @@ block_key (char *key, size_t *key_len,
 {
   void *message;
   int size;
+#ifndef __APPLE__
   unsigned int out_key_len;
+#endif /*__APPLE__*/
 
   /* The message x||y */
   assert (x < 256);

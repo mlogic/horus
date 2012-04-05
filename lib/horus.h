@@ -44,10 +44,7 @@
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 
-/* Actual branch factor is 2^BRANCH_FACTOR_BITS, i.e., 2^2 = 4. */
-#define BRANCH_FACTOR_BITS     2
-#define MIN_CHUNK_SIZE      4096
-#define HORUS_BLOCK_SIZE (MIN_CHUNK_SIZE)
+#define HORUS_BLOCK_SIZE 4096
 #define HORUS_KEY_LEN    (160/8)
 
 #include <minmax.h>
