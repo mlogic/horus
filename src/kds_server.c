@@ -50,7 +50,7 @@ usage ()
 pthread_mutex_t kds_server_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int
-kds_get_client_key (struct in_addr *client,
+kds_get_client_key (int id, struct in_addr *client,
                     key_request_packet *kreq,
                     key_response_packet *kresp)
 {
@@ -61,11 +61,18 @@ kds_get_client_key (struct in_addr *client,
   size_t key_len = HORUS_MAX_KEY_LEN;
   u_int32_t kreqx, kreqy;
 
+  kreqx = (u_int32_t) ntohl (kreq->x);
+  kreqy = (u_int32_t) ntohl (kreq->y);
+
+  if (horus_verbose)
+    printf ("thread[%d]: request: K_%d,%d file: %s\n",
+            id, kreqx, kreqy, kreq->filename);
+
   fd = open (kreq->filename, O_RDONLY);
   if (fd < 0)
     {
       if (horus_verbose)
-        printf ("open: error: file: %s\n", kreq->filename);
+        printf ("thread[%d]: open error\n", id);
       kresp->err = htons (HORUS_ERR_OPEN);
       kresp->suberr = htons (errno);
       return 0;
@@ -75,6 +82,8 @@ kds_get_client_key (struct in_addr *client,
   close (fd);
   if (ret < 0)
     {
+      if (horus_verbose)
+        printf ("thread[%d]: get_file_config error\n", id);
       kresp->err = htons (HORUS_ERR_CONFIG_GET);
       kresp->suberr = htons (errno);
       return 0;
@@ -83,28 +92,36 @@ kds_get_client_key (struct in_addr *client,
   ret = horus_get_client_range (&c, client, &sblock, &eblock);
   if (ret < 0)
     {
+      if (horus_verbose)
+        printf ("thread[%d]: no such client\n", id);
       kresp->err = htons (HORUS_ERR_NO_SUCH_CLIENT);
       kresp->suberr = htons (errno);
       return 0;
     }
 
-  kreqx = (u_int32_t) ntohl (kreq->x);
-  kreqy = (u_int32_t) ntohl (kreq->y);
-
   if (kreqx >= HORUS_MAX_KHT_DEPTH)
     {
       if (horus_verbose)
-        printf ("open: error: kreq x: %lu out of max_kht_depth: %d\n",
-                kreqx, HORUS_MAX_KHT_DEPTH);
+        printf ("thread[%d]: kreq x: %lu out of max_kht_depth: %d\n",
+                id, (unsigned long) kreqx, HORUS_MAX_KHT_DEPTH);
       kresp->err = htons (HORUS_ERR_REQ_OUT_OF_RANGE);
       kresp->suberr = htons (EINVAL);
       return 0;
     }
+#ifndef DISABLE_KEY_X_ADJUSTING
   if (c.kht_block_size[kreqx] == 0)
     {
       if (horus_verbose)
-        printf ("open: error: kreq x: %lu kht_block_size: %d\n",
-                kreqx, c.kht_block_size[kreqx]);
+        printf ("thread[%d]: adjusting x\n", id);
+      do {
+        kreqx--;
+      } while (kreqx > 0 && c.kht_block_size[kreqx] == 0);
+    }
+#endif /*DISABLE_KEY_X_ADJUSTING*/
+  if (c.kht_block_size[kreqx] == 0)
+    {
+      if (horus_verbose)
+        printf ("thread[%d]: kht_block_size[%d] == 0\n", id, kreqx);
       kresp->err = htons (HORUS_ERR_REQ_OUT_OF_RANGE);
       kresp->suberr = htons (EINVAL);
       return 0;
@@ -114,6 +131,8 @@ kds_get_client_key (struct in_addr *client,
   end = ((kreqy + 1) * c.kht_block_size[kreqx]);
   if (! (sblock <= start && end <= eblock))
     {
+      if (horus_verbose)
+        printf ("thread[%d]: client not allowed\n", id);
       kresp->err = htons (HORUS_ERR_REQ_NOT_ALLOWED);
       kresp->suberr = htons (EINVAL);
       return 0;
@@ -124,11 +143,14 @@ kds_get_client_key (struct in_addr *client,
                              c.kht_block_size);
   if (ret < 0)
     {
-      kresp->err = htons (HORUS_ERR_REQ_NOT_ALLOWED);
+      if (horus_verbose)
+        printf ("thread[%d]: horus_key_by_master failed\n", id);
+      kresp->err = htons (HORUS_ERR_UNKNOWN);
       kresp->suberr = htons (EINVAL);
       return 0;
     }
 
+  /* send back the response */
   kresp->x = htonl (kreqx);
   kresp->y = htonl (kreqy);
   memcpy (kresp->filename, kreq->filename, sizeof (kresp->filename));
@@ -198,7 +220,7 @@ handle_kds_client (void *arg)
         }
 
       /* Calculate the key for the client */
-      kds_get_client_key (&client.sin_addr, &kreq, &kresp);
+      kds_get_client_key (id, &client.sin_addr, &kreq, &kresp);
 
       /* Send the key to the client */
       ret = sendto (fd, &kresp, sizeof (kresp), 0,

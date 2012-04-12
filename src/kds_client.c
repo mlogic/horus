@@ -3,6 +3,7 @@
 #include <kds_protocol.h>
 #include <assert.h>
 #include <getopt.h>
+#include <horus_stats.h>
 #include <benchmark.h>
 #include "timeval.h"
 
@@ -100,11 +101,11 @@ main (int argc, char **argv)
   int kresperr, krespsuberr, krespkeylen;
   double time;
 
-  unsigned long long stat_success, stat_einval, stat_eaccess;
+  struct horus_stats stats;
 
   keyx = keyy = 0;
   off = len = 0;
-  stat_success = stat_einval = stat_eaccess = 0;
+  memset (&stats, 0, sizeof (stats));
 
   server = HORUS_KDS_SERVER_ADDR;
   ret = inet_pton (AF_INET, server, &sin_addr);
@@ -241,8 +242,9 @@ main (int argc, char **argv)
       offblock = (off ? off / HORUS_BLOCK_SIZE : 0);
       nblock = (len ? len / HORUS_BLOCK_SIZE : 1);
 
-      if (horus_verbose)
-        printf ("block offset %lu length %lu\n", offblock, nblock);
+      if (benchmark || horus_verbose)
+        printf ("block size: %d offset %lu length %lu\n",
+                HORUS_BLOCK_SIZE, offblock, nblock);
 
       if (benchmark)
         gettimeofday (&start, NULL);
@@ -256,21 +258,7 @@ main (int argc, char **argv)
           kresperr = (int) ntohs (kresp.err);
           krespsuberr = (int) ntohs (kresp.suberr);
           krespkeylen = (int) ntohl (kresp.key_len);
-
-          switch (kresperr)
-            {
-            case 0:
-              stat_success++;
-              break;
-            case EINVAL:
-              stat_einval++;
-              break;
-            case EACCES:
-              stat_eaccess++;
-              break;
-            default:
-              break;
-            }
+          horus_stats_record (&stats, kresperr, krespsuberr);
 
           if (! benchmark)
             {
@@ -287,8 +275,7 @@ main (int argc, char **argv)
       if (benchmark)
         gettimeofday (&end, NULL);
 
-      printf ("key total: %lu success: %llu inval: %llu eaccess: %llu\n",
-              nblock, stat_success, stat_einval, stat_eaccess);
+      horus_stats_print (&stats);
 
       if (benchmark)
         {
@@ -301,4 +288,5 @@ main (int argc, char **argv)
 
   return 0;
 }
+
 
