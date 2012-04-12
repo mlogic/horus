@@ -19,12 +19,13 @@ extern int optreset;
 extern int horus_debug;
 extern int horus_verbose;
 
-const char *optstring = "bvdhs:p:x:y:o:l:";
+const char *optstring = "bvdhn:s:p:x:y:o:l:";
 const char *optusage = "\
 -b, --benchmark   Turn on benchmarking\n\
 -v, --verbose     Turn on verbose mode\n\
 -d, --debug       Turn on debugging mode\n\
 -h, --help        Display this help and exit\n\
+-n, --nthread     Specify the number of thread\n\
 -s, --server      Specify server IP address (default: %s)\n\
 -p, --port        Specify server UDP port (default: %d)\n\
 -x, --key-x       Specify x to calculate key K_x,y\n\
@@ -38,6 +39,7 @@ const struct option longopts[] = {
   { "verbose",    no_argument,        NULL, 'v' },
   { "debug",      no_argument,        NULL, 'd' },
   { "help",       no_argument,        NULL, 'h' },
+  { "nthread",    required_argument,  NULL, 'n' },
   { "key-x",      required_argument,  NULL, 'x' },
   { "key-y",      required_argument,  NULL, 'y' },
   { "offset",     required_argument,  NULL, 'o' },
@@ -48,7 +50,7 @@ const struct option longopts[] = {
 void
 usage ()
 {
-  printf ("Usage : %s [OPTION...] <server_addr> <filename>\n", progname);
+  printf ("Usage : %s [OPTION...] <filename>\n", progname);
   printf ("\n");
   printf ("options are \n");
   printf (optusage, HORUS_KDS_SERVER_ADDR, HORUS_KDS_SERVER_PORT);
@@ -82,6 +84,7 @@ client_sendrecv (int fd, struct sockaddr_in *srv_addr,
 int
 main (int argc, char **argv)
 {
+  int nthread = HORUS_THREAD_MAX;
   int fd;
   int ret, ch, i;
   struct in_addr sin_addr;
@@ -94,7 +97,7 @@ main (int argc, char **argv)
   char *server = NULL, *filename = NULL;
   char *endptr;
   struct timeval start, end, res;
-  int kresperr, krespkeylen;
+  int kresperr, krespsuberr, krespkeylen;
   double time;
 
   unsigned long long stat_success, stat_einval, stat_eaccess;
@@ -121,6 +124,14 @@ main (int argc, char **argv)
           break;
         case 'd':
           horus_debug++;
+          break;
+        case 'n':
+          nthread = (int) strtol (optarg, &endptr, 0);
+          if (*endptr != '\0')
+            {
+              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
+              return -1;
+            }
           break;
         case 's':
           server = optarg;
@@ -209,9 +220,12 @@ main (int argc, char **argv)
       kreq.y = htonl (keyy);
       client_sendrecv (fd, &srv_addr, &kreq, &kresp);
 
-      kresperr = (int) ntohl (kresp.err);
+      kresperr = (int) ntohs (kresp.err);
+      krespsuberr = (int) ntohs (kresp.suberr);
       krespkeylen = (int) ntohl (kresp.key_len);
-      printf ("err = %d: %s\n", kresperr, strerror (kresperr));
+
+      printf ("err = %d : %s\n", kresperr, horus_strerror (kresperr));
+      printf ("suberr = %d : %s\n", krespsuberr, strerror (krespsuberr));
       if (! kresperr)
         printf ("key_%d,%d = %s\n", keyx, keyy,
                 print_key (kresp.key, krespkeylen));
@@ -239,7 +253,8 @@ main (int argc, char **argv)
           kreq.y = htonl (keyy);
           client_sendrecv (fd, &srv_addr, &kreq, &kresp);
 
-          kresperr = (int) ntohl (kresp.err);
+          kresperr = (int) ntohs (kresp.err);
+          krespsuberr = (int) ntohs (kresp.suberr);
           krespkeylen = (int) ntohl (kresp.key_len);
 
           switch (kresperr)
@@ -259,7 +274,10 @@ main (int argc, char **argv)
 
           if (! benchmark)
             {
-              printf ("err = %d: %s\n", kresperr, strerror (kresperr));
+              printf ("err = %d : %s\n",
+                      kresperr, horus_strerror (kresperr));
+              printf ("suberr = %d : %s\n",
+                      krespsuberr, strerror (krespsuberr));
               if (! kresperr)
                 printf ("key_%d,%d = %s\n", keyx, keyy,
                          print_key (kresp.key, krespkeylen));

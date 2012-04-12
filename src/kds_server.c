@@ -20,18 +20,20 @@ extern int optreset;
 extern int horus_debug;
 extern int horus_verbose;
 
-const char *optstring = "bvdh";
+const char *optstring = "bvdhn:";
 const char *optusage = "\
 -b, --benchmark   Turn on benchmarking\n\
 -v, --verbose     Turn on verbose mode\n\
 -d, --debug       Turn on debugging mode\n\
 -h, --help        Display this help and exit\n\
+-n, --nthread     Specify the number of thread\n\
 ";
 const struct option longopts[] = {
   { "benchmark",  no_argument,        NULL, 'b' },
   { "verbose",    no_argument,        NULL, 'v' },
   { "debug",      no_argument,        NULL, 'd' },
   { "help",       no_argument,        NULL, 'h' },
+  { "nthread",    required_argument,  NULL, 'n' },
   { NULL,         0,                  NULL,  0  }
 };
 
@@ -45,35 +47,7 @@ usage ()
   exit (0);
 }
 
-static int num_threads = 0;
-pthread_mutex_t kds_client_th = PTHREAD_MUTEX_INITIALIZER;
-
-static void
-increment_thread_count (void)
-{
-  pthread_mutex_lock (&kds_client_th);
-  num_threads++;
-  pthread_mutex_unlock (&kds_client_th);
-}
-
-static void
-decrement_thread_count (void)
-{
-  pthread_mutex_lock (&kds_client_th);
-  num_threads--;
-  pthread_mutex_unlock (&kds_client_th);
-}
-
-static int
-thread_count (void)
-{
-  int val;
-
-  pthread_mutex_lock (&kds_client_th);
-  val = num_threads;
-  pthread_mutex_unlock (&kds_client_th);
-  return val;
-}
+pthread_mutex_t kds_server_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int
 kds_get_client_key (struct in_addr *client,
@@ -90,7 +64,10 @@ kds_get_client_key (struct in_addr *client,
   fd = open (kreq->filename, O_RDONLY);
   if (fd < 0)
     {
-      kresp->err = htonl (errno);
+      if (horus_verbose)
+        printf ("open: error: file: %s\n", kreq->filename);
+      kresp->err = htons (HORUS_ERR_OPEN);
+      kresp->suberr = htons (errno);
       return 0;
     }
 
@@ -98,14 +75,16 @@ kds_get_client_key (struct in_addr *client,
   close (fd);
   if (ret < 0)
     {
-      kresp->err = htonl (ret);
+      kresp->err = htons (HORUS_ERR_CONFIG_GET);
+      kresp->suberr = htons (errno);
       return 0;
     }
 
   ret = horus_get_client_range (&c, client, &sblock, &eblock);
   if (ret < 0)
     {
-      kresp->err = htonl (ret);
+      kresp->err = htons (HORUS_ERR_NO_SUCH_CLIENT);
+      kresp->suberr = htons (errno);
       return 0;
     }
 
@@ -114,12 +93,20 @@ kds_get_client_key (struct in_addr *client,
 
   if (kreqx >= HORUS_MAX_KHT_DEPTH)
     {
-      kresp->err = htonl (EINVAL);
+      if (horus_verbose)
+        printf ("open: error: kreq x: %lu out of max_kht_depth: %d\n",
+                kreqx, HORUS_MAX_KHT_DEPTH);
+      kresp->err = htons (HORUS_ERR_REQ_OUT_OF_RANGE);
+      kresp->suberr = htons (EINVAL);
       return 0;
     }
   if (c.kht_block_size[kreqx] == 0)
     {
-      kresp->err = htonl (EINVAL);
+      if (horus_verbose)
+        printf ("open: error: kreq x: %lu kht_block_size: %d\n",
+                kreqx, c.kht_block_size[kreqx]);
+      kresp->err = htons (HORUS_ERR_REQ_OUT_OF_RANGE);
+      kresp->suberr = htons (EINVAL);
       return 0;
     }
 
@@ -127,7 +114,8 @@ kds_get_client_key (struct in_addr *client,
   end = ((kreqy + 1) * c.kht_block_size[kreqx]);
   if (! (sblock <= start && end <= eblock))
     {
-      kresp->err = htonl (EACCES);
+      kresp->err = htons (HORUS_ERR_REQ_NOT_ALLOWED);
+      kresp->suberr = htons (EINVAL);
       return 0;
     }
 
@@ -136,7 +124,8 @@ kds_get_client_key (struct in_addr *client,
                              c.kht_block_size);
   if (ret < 0)
     {
-      kresp->err = htonl (EINVAL);
+      kresp->err = htons (HORUS_ERR_REQ_NOT_ALLOWED);
+      kresp->suberr = htons (EINVAL);
       return 0;
     }
 
@@ -152,75 +141,85 @@ kds_get_client_key (struct in_addr *client,
   return 0;
 }
 
+struct thread_arg {
+  int fd;
+  int id;
+};
+
 void *
-handle_kds_client (void *p)
+handle_kds_client (void *arg)
 {
+  struct thread_arg *targ = (struct thread_arg *) arg;
+  int id;
   int fd;
   int ret;
   socklen_t client_len;
   struct sockaddr_in client;
   struct key_request_packet kreq;
   struct key_response_packet kresp;
-  struct horus_clock clock_key, clock_total;
+  char buf[32];
 
-  if (benchmark)
-    start_horus_clock (&clock_total);
-
-  pthread_detach (pthread_self ());
-  increment_thread_count ();
+  id = targ->id;
+  fd = targ->fd;
 
   if (horus_verbose)
-    printf ("thread[%d]: %s\n", thread_count (), __func__);
+    printf ("thread[%d]: start\n", id);
 
-  fd = *(int *) p;
-  client_len = (socklen_t) sizeof (client);
-  ret = recvfrom (fd, &kreq, sizeof (kreq), 0, (struct sockaddr *) &client,
-                  &client_len);
-  if (ret <= 0)
+  while (1)
     {
+      client_len = (socklen_t) sizeof (client);
+      memset (&kreq, 0, sizeof (kreq));
+      memset (&kresp, 0, sizeof (kresp));
+
+      pthread_mutex_lock (&kds_server_mutex);
+      ret = recvfrom (fd, &kreq, sizeof (kreq), 0,
+                      (struct sockaddr *) &client, &client_len);
+      pthread_mutex_unlock (&kds_server_mutex);
+
+      if (ret <= 0)
+        {
+          if (horus_verbose)
+            printf ("thread[%d]: recvfrom() failed: %s\n",
+                    id, strerror (errno));
+          pthread_exit (NULL);
+        }
+
+      if (ret != sizeof (key_request_packet))
+        {
+          if (horus_verbose)
+            printf ("thread[%d]: recvfrom(): invalid size: %d\n", id, ret);
+          pthread_exit (NULL);
+        }
+
       if (horus_verbose)
-        printf ("recvfrom() failed: %s\n", strerror (errno));
+        {
+          inet_ntop (AF_INET, &client.sin_addr, buf, sizeof (buf));
+          printf ("thread[%d]: recvfrom(): %s\n", id, buf);
+        }
 
-      decrement_thread_count ();
-      pthread_exit (NULL);
+      /* Calculate the key for the client */
+      kds_get_client_key (&client.sin_addr, &kreq, &kresp);
+
+      /* Send the key to the client */
+      ret = sendto (fd, &kresp, sizeof (kresp), 0,
+                    (struct sockaddr *) &client, client_len);
+
+      if (horus_verbose)
+        {
+          printf ("thread[%d]: sendto(): %s: ret: %d\n", id, buf, ret);
+        }
     }
-  assert (ret == sizeof (key_request_packet));
-
-  if (benchmark)
-    start_horus_clock (&clock_key);
-
-  /* Calculate the key for the client */
-  kds_get_client_key (&client.sin_addr, &kreq, &kresp);
-
-  if (benchmark)
-    stop_horus_clock (&clock_key);
-
-  /* Send the key to the client */
-  sendto (fd, &kresp, sizeof (kresp), 0, (struct sockaddr *) &client,
-          client_len);
-
-  if (benchmark)
-    {
-      stop_horus_clock (&clock_total);
-      printf ("key ");
-      print_horus_clock_time (&clock_key);
-      printf (" total ");
-      print_horus_clock_time (&clock_total);
-      printf ("\n");
-    }
-
-  /* XXX decrement may better be done in the parent thread
-     that is watchdogging. */
-  decrement_thread_count ();
-  pthread_exit (NULL);
 }
 
 int
 main (int argc, char **argv)
 {
-  int fd, ret, ch;
-  fd_set fds;
-  pthread_t th[HORUS_THREAD_MAX];
+  int fd, ch;
+  char *endptr;
+  int nthread = HORUS_THREAD_MAX;
+  pthread_t *thread;
+  struct thread_arg *thread_arg;
+  int i;
 
   progname = (1 ? "kds_server" : argv[0]);
   benchmark = 0;
@@ -237,6 +236,14 @@ main (int argc, char **argv)
         case 'd':
           horus_debug++;
           break;
+        case 'n':
+          nthread = (int) strtol (optarg, &endptr, 0);
+          if (*endptr != '\0')
+            {
+              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
+              return -1;
+            }
+          break;
         default:
           usage ();
           break;
@@ -245,32 +252,38 @@ main (int argc, char **argv)
   argc -= optind;
   argv += optind;
 
+  thread = (pthread_t *) malloc (sizeof (pthread_t) * nthread);
+  assert (thread);
+  thread_arg = (struct thread_arg *)
+    malloc (sizeof (struct thread_arg) * nthread);
+  assert (thread_arg);
+
   fd = server_socket (PF_INET, SOCK_DGRAM,
                       HORUS_KDS_SERVER_PORT, "kds_server_udp");
   assert (fd >= 0);
 
+#if 0
   /* To support spurious return from Linux select() */
   fcntl (fd, F_SETFL, O_NONBLOCK);
+#endif
 
-  printf ("KDS started!\n");
+  printf ("KDS started with %d threads !\n", nthread);
 
-  while (1)
+  for (i = 0; i < nthread; i++)
     {
-      FD_ZERO (&fds);
-      FD_SET (fd, &fds);
-
-      ret = select (fd + 1, &fds, NULL, NULL, NULL);
-      assert (ret >= 0);
-
-      if (FD_ISSET (fd, &fds))
-        {
-          /* XXX th[] might shift incorrectly. */
-          if (thread_count () < HORUS_THREAD_MAX)
-            pthread_create (&th[thread_count ()], NULL,
-                            handle_kds_client, (void *) &fd);
-        }
+      thread_arg[i].id = i;
+      thread_arg[i].fd = fd;
+      pthread_create (&thread[i], NULL,
+                      handle_kds_client, (void *) &thread_arg[i]);
     }
+
+  for (i = 0; i < nthread; i++)
+    pthread_join (thread[i], NULL);
+
+  free (thread);
+  free (thread_arg);
 
   return 0;
 }
+
 
