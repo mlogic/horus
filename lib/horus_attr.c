@@ -211,3 +211,11 @@ horus_delete_file_config (int fd)
   return ret;
 }
 
+int
+horus_is_valid_config (struct horus_file_config *c)
+{
+  if (c->kht_block_size[0] != 0)
+    return 1;
+}
+
+
