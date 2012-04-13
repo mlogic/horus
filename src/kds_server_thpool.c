@@ -8,10 +8,19 @@
 #include <benchmark.h>
 #include <pthread.h>
 #include "thpool.h"
+#include <signal.h>
 
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
 char *progname;
 int benchmark = 0;
+
+struct key_packet
+{
+  struct key_request_packet kreq;
+  socklen_t client_len;
+  struct sockaddr_in client;
+  int fd;
+};
 
 extern char *optarg;
 extern int optind;
@@ -47,34 +56,11 @@ usage ()
   exit (0);
 }
 
-static int num_threads = 0;
-pthread_mutex_t kds_client_th = PTHREAD_MUTEX_INITIALIZER;
-
-static void
-increment_thread_count (void)
+void
+exit_kds(int sig)
 {
-  pthread_mutex_lock (&kds_client_th);
-  num_threads++;
-  pthread_mutex_unlock (&kds_client_th);
-}
-
-static void
-decrement_thread_count (void)
-{
-  pthread_mutex_lock (&kds_client_th);
-  num_threads--;
-  pthread_mutex_unlock (&kds_client_th);
-}
-
-static int
-thread_count (void)
-{
-  int val;
-
-  pthread_mutex_lock (&kds_client_th);
-  val = num_threads;
-  pthread_mutex_unlock (&kds_client_th);
-  return val;
+  fprintf(stderr,"Exiting KDS\n");
+  exit(0);
 }
 
 static int
@@ -103,7 +89,6 @@ kds_get_client_key (struct in_addr *client,
       kresp->err = htonl (ret);
       return 0;
     }
-
   ret = horus_get_client_range (&c, client, &sblock, &eblock);
   if (ret < 0)
     {
@@ -157,50 +142,26 @@ kds_get_client_key (struct in_addr *client,
 void *
 handle_kds_client (void *p)
 {
-  int fd;
-  int ret;
-  socklen_t client_len;
-  struct sockaddr_in client;
-  struct key_request_packet kreq;
   struct key_response_packet kresp;
   struct horus_clock clock_key, clock_total;
+  struct key_packet *kp = p;
 
   if (benchmark)
     start_horus_clock (&clock_total);
 
-//  pthread_detach (pthread_self ());
-//  increment_thread_count ();
-
-  if (horus_verbose)
-    printf ("thread[%d]: %s\n", thread_count (), __func__);
-
-  fd = *(int *) p;
-  client_len = (socklen_t) sizeof (client);
-  ret = recvfrom (fd, &kreq, sizeof (kreq), 0, (struct sockaddr *) &client,
-                  &client_len);
-  if (ret <= 0)
-    {
-      if (horus_verbose)
-        printf ("recvfrom() failed: %s\n", strerror (errno));
-
-     // decrement_thread_count ();
-     // pthread_exit (NULL);
-      return;
-    }
-  assert (ret == sizeof (key_request_packet));
 
   if (benchmark)
     start_horus_clock (&clock_key);
 
   /* Calculate the key for the client */
-  kds_get_client_key (&client.sin_addr, &kreq, &kresp);
+  kds_get_client_key (&kp->client.sin_addr, &kp->kreq, &kresp);
 
   if (benchmark)
     stop_horus_clock (&clock_key);
 
   /* Send the key to the client */
-  sendto (fd, &kresp, sizeof (kresp), 0, (struct sockaddr *) &client,
-          client_len);
+  sendto (kp->fd, &kresp, sizeof (kresp), 0, (struct sockaddr *) &kp->client,
+          kp->client_len);
 
   if (benchmark)
     {
@@ -212,19 +173,15 @@ handle_kds_client (void *p)
       printf ("\n");
     }
 
-  /* XXX decrement may better be done in the parent thread
-     that is watchdogging. */
-//  decrement_thread_count ();
-//  pthread_exit (NULL);
+  free(kp);
+  return 0;
 }
 
 int
 main (int argc, char **argv)
 {
-  int fd, ret, ch;
-  fd_set fds;
-  pthread_t th[HORUS_THREAD_MAX];
-
+  int ret, ch,fd;
+  struct key_packet *kp = NULL;
   thpool_t* threadpool;
   progname = (1 ? "kds_server" : argv[0]);
   benchmark = 0;
@@ -249,32 +206,31 @@ main (int argc, char **argv)
   argc -= optind;
   argv += optind;
 
+  (void) signal(SIGINT, exit_kds);
+
   threadpool = thpool_init(HORUS_THREAD_MAX);
 
   fd = server_socket (PF_INET, SOCK_DGRAM,
                       HORUS_KDS_SERVER_PORT, "kds_server_udp");
   assert (fd >= 0);
 
-  /* To support spurious return from Linux select() */
-  fcntl (fd, F_SETFL, O_NONBLOCK);
-
   printf ("KDS started!\n");
 
   while (1)
     {
-      FD_ZERO (&fds);
-      FD_SET (fd, &fds);
-
-      ret = select (fd + 1, &fds, NULL, NULL, NULL);
-      assert (ret >= 0);
-
-      if (FD_ISSET (fd, &fds))
+      if (kp == NULL)
+        kp = malloc(sizeof(struct key_packet));
+      kp->client_len = (socklen_t) sizeof (kp->client);
+      ret = recvfrom (fd, &kp->kreq, sizeof (kp->kreq), 0, (struct sockaddr *) &kp->client,
+                      &kp->client_len);
+      if (ret >0)
         {
-          /* XXX th[] might shift incorrectly. */
-            thpool_add_work(threadpool, handle_kds_client, (void *) &fd);
+          kp->fd = fd;
+          assert (ret == sizeof (key_request_packet));
+          thpool_add_work(threadpool, handle_kds_client, (void *) kp);
+          kp = NULL;
         }
     }
-
   return 0;
 }
 
