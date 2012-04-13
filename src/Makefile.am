@@ -23,7 +23,7 @@ kds_server_thpool_SOURCES = thpool.c kds_server_thpool.c
 kds_server_thpool_LDADD = ../lib/libhorus.la @PTHREAD_LIBS@
 
 kds_client_SOURCES = kds_client.c
-kds_client_LDADD = ../lib/libhorus.la
+kds_client_LDADD = ../lib/libhorus.la @PTHREAD_LIBS@
 
 
 noinst_PROGRAMS = test-shell test-command-shell test-pthread test-openssl
