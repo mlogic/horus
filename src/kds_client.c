@@ -12,6 +12,8 @@
 char *progname;
 int benchmark = 0;
 
+struct thread_info *thread = NULL;
+
 extern char *optarg;
 extern int optind;
 extern int optopt;
@@ -21,7 +23,7 @@ extern int optreset;
 extern int horus_debug;
 extern int horus_verbose;
 
-const char *optstring = "bvdhn:s:p:x:y:o:l:r:w:";
+const char *optstring = "bvdhn:s:p:x:y:o:l:";
 const char *optusage = "\
 -b, --benchmark   Turn on benchmarking\n\
 -v, --verbose     Turn on verbose mode\n\
@@ -34,8 +36,6 @@ const char *optusage = "\
 -y, --key-y       Specify y to calculate key K_x,y\n\
 -o, --offset      Specify file offset to access\n\
 -l, --length      Specify size of the range to access (from offset)\n\
--r, --rthread     Specify the number of read (wait-response) thread\n\
--w, --wthread     Specify the number of write (request) thread\n\
 ";
 
 const struct option longopts[] = {
@@ -62,39 +62,8 @@ usage ()
   exit (0);
 }
 
-int
-client_sendrecv (int fd, struct sockaddr_in *serv_addr,
-                 const key_request_packet* kreq,
-                 key_response_packet *kresp)
-{
-  int ret = -1;
-  socklen_t addrlen;
-
-  assert ((kreq != NULL) && (kresp != NULL));
-  ret = sendto (fd, kreq, sizeof (key_request_packet), 0,
-                (struct sockaddr *) serv_addr, sizeof (struct sockaddr_in));
-  if (ret < 0)
-    {
-      printf ("sendto() failed: %s\n", strerror (errno));
-      return -1;
-    }
-  if (ret != sizeof (key_request_packet))
-    {
-      printf ("sendto() ret: %d\n", ret);
-    }
-
-  do
-    {
-      addrlen = sizeof (struct sockaddr_in);
-      ret = recvfrom (fd, kresp, sizeof (key_response_packet), 0,
-                      (struct sockaddr *) serv_addr, &addrlen);
-    }
-  while (ret <= 0);
-  assert (ret == sizeof (key_response_packet));
-  return 0;
-}
-
-struct thread_arg {
+struct thread_info {
+  pthread_t pthread;
   int id;
   int fd;
   u_int32_t level;
@@ -102,36 +71,57 @@ struct thread_arg {
   int nblock;
   char *filename;
   struct sockaddr_in *serv_addr;
+  struct timeval timeval;
+  struct horus_stats stats;
 };
 
 void *
 thread_read_write (void *arg)
 {
-  struct thread_arg *targ = (struct thread_arg *) arg;
-  int i;
-  int id;
-  int fd;
-  struct timeval start, end, res;
-  double time;
-  struct horus_stats stats;
+  struct thread_info *info = (struct thread_info *) arg;
+  int i, ret;
+  int id, fd;
+
+  /* for request */
+  u_int32_t reqx, reqy;
   unsigned long boffset, nblock;
-  u_int32_t keyx, keyy;
+  struct sockaddr_in *serv_addr;
+  struct key_request_packet kreq;
+
+  /* for read */
+  u_int32_t resx, resy;
+  struct sockaddr_in addr;
+  socklen_t addrlen;
+  struct key_response_packet kresp;
   int kresperr, krespsuberr, krespkeylen;
 
-  struct key_request_packet kreq;
-  struct key_response_packet kresp;
+  struct timeval start, end, res;
+  double time;
+  int success, resend, reread;
+  const int nresend = 2, nreread = 2;
 
-  id = targ->id;
-  fd = targ->fd;
-  boffset = targ->boffset;
-  nblock = targ->nblock;
+  id = info->id;
+  fd = info->fd;
 
-  memset (&stats, 0, sizeof (stats));
+  memset (&info->stats, 0, sizeof (struct horus_stats));
 
+  fd = socket (PF_INET, SOCK_DGRAM, 0);
+  if (fd < 0)
+    {
+      printf ("thread[%d]: Unable to open socket!: %s\n",
+              id, strerror (errno));
+      return NULL;
+    }
+  //fcntl (fd, F_SETFL, O_NONBLOCK);
+
+  serv_addr = info->serv_addr;
+  boffset = info->boffset;
+  nblock = info->nblock;
   memset (&kreq, 0, sizeof (kreq));
-  keyx = targ->level;
-  kreq.x = htonl (keyx);
-  strncpy (kreq.filename, targ->filename, sizeof (kreq.filename));
+
+  reqx = info->level;
+  kreq.x = htonl (reqx);
+  strncpy (kreq.filename, info->filename, sizeof (kreq.filename));
 
   if (benchmark || horus_verbose)
     printf ("thread[%d]: block size: %d boffset %lu nblock %lu\n",
@@ -142,39 +132,81 @@ thread_read_write (void *arg)
 
   for (i = 0; i < nblock; i++)
     {
-      keyy = boffset + i;
-      kreq.y = htonl (keyy);
-      client_sendrecv (fd, targ->serv_addr, &kreq, &kresp);
+      reqy = boffset + i;
+      kreq.y = htonl (reqy);
+
+      success = 0;
+      resend = nresend;
+      do {
+          ret = sendto (fd, &kreq, sizeof (key_request_packet), 0,
+                        (struct sockaddr *) serv_addr,
+                        sizeof (struct sockaddr_in));
+          if (ret != sizeof (key_request_packet))
+            {
+              if (horus_verbose)
+                printf ("thread[%d]: sendto(): failed: %d, skip\n", id, ret);
+              info->stats.sendfail++;
+              continue;
+            }
+
+          reread = nreread;
+          do {
+              addrlen = sizeof (struct sockaddr_in);
+              ret = recvfrom (fd, &kresp, sizeof (key_response_packet), 0,
+                              (struct sockaddr *) &addr, &addrlen);
+              if (ret != sizeof (key_response_packet))
+                {
+                  if (horus_verbose)
+                    printf ("thread[%d]: recvfrom(): failed: %d\n", id, ret);
+                  info->stats.recvfail++;
+                  continue;
+                }
+              else
+                success++;
+          } while (! success && reread--);
+      } while (! success && resend--);
+
+      info->stats.sendretry += nresend - resend;
+      info->stats.recvretry += nreread - reread;
+
+      if (! success)
+        {
+          info->stats.giveup++;
+          continue;
+        }
+      info->stats.success++;
 
       kresperr = (int) ntohs (kresp.err);
       krespsuberr = (int) ntohs (kresp.suberr);
       krespkeylen = (int) ntohl (kresp.key_len);
-      horus_stats_record (&stats, kresperr, krespsuberr);
+      horus_stats_record (&info->stats, kresperr, krespsuberr);
+
+      resx = ntohl (kresp.x);
+      resy = ntohl (kresp.y);
+
+      if (resx != reqx || resy != reqy)
+        info->stats.resmismatch++;
 
       if (! benchmark)
         {
-          printf ("thread[%d]: err = %d : %s\n", id,
-                  kresperr, horus_strerror (kresperr));
-          printf ("thread[%d]: suberr = %d : %s\n", id,
-                  krespsuberr, strerror (krespsuberr));
+          if (kresperr)
+            printf ("thread[%d]: err = %d : %s\n", id,
+                    kresperr, horus_strerror (kresperr));
+          if (krespsuberr)
+            printf ("thread[%d]: suberr = %d : %s\n", id,
+                    krespsuberr, strerror (krespsuberr));
           if (! kresperr)
-            printf ("thread[%d]: key_%d,%d = %s\n", id, keyx, keyy,
-                     print_key (kresp.key, krespkeylen));
+            printf ("thread[%d]: key_%d,%d: key_%d,%d = %s\n", id,
+                    reqx, reqy, resx, resy,
+                    print_key (kresp.key, krespkeylen));
         }
     }
 
-  if (benchmark)
-    gettimeofday (&end, NULL);
+  close (fd);
 
-  //horus_stats_print (&stats);
-
-  if (benchmark)
-    {
-      timeval_sub (&end, &start, &res);
-      time = res.tv_sec + res.tv_usec * 0.000001;
-      printf ("thread[%d]: %lu keys in %f secs ( %f q/s\n",
-              id, nblock, time, nblock/time);
-    }
+  if (! benchmark && horus_verbose)
+    printf ("thread[%d]: %llu keys processed.\n",
+            id, info->stats.success);
 
   return NULL;
 }
@@ -196,11 +228,11 @@ main (int argc, char **argv)
   unsigned long leaf_level = 0;
   struct horus_file_config c;
   int dumb_ass_mode = 0;
+  struct horus_stats stats;
+  struct timeval start, end, res;
+  double time;
 
-  int nthread = 0, rthread = 0, wthread = 0;
-  pthread_t *thread;
-  struct thread_arg *thread_arg;
-  struct thread_ret *thread_ret;
+  int nthread = 0;
 
   keyx = keyy = 0;
   offset = length = 0;
@@ -282,22 +314,6 @@ main (int argc, char **argv)
               return -1;
             }
           break;
-        case 'r':
-          rthread = (int) strtol (optarg, &endptr, 0);
-          if (*endptr != '\0')
-            {
-              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
-              return -1;
-            }
-          break;
-        case 'w':
-          wthread = (int) strtol (optarg, &endptr, 0);
-          if (*endptr != '\0')
-            {
-              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
-              return -1;
-            }
-          break;
         default:
           usage ();
           break;
@@ -316,36 +332,15 @@ main (int argc, char **argv)
   if (! filename)
     usage ();
 
-  if (rthread || wthread)
-    {
-      if (nthread)
-        {
-          if (rthread == 0)
-            rthread = nthread - wthread;
-          if (wthread == 0)
-            wthread = nthread - rthread;
-        }
-      else
-        {
-          if (rthread == 0)
-            rthread = 1;
-          if (wthread == 0)
-            wthread = 1;
-        }
-      nthread = rthread + wthread;
-    }
-  else if (nthread == 0)
-    {
-      nthread = 4;
-    }
+  if (nthread == 0)
+    nthread = 1;
 
-  assert (nthread > 1);
+  assert (nthread > 0);
   if (nthread > HORUS_THREAD_MAX)
     {
       printf ("max #threads: %d\n", HORUS_THREAD_MAX);
       exit (1);
     }
-
 
   memset (&c, 0, sizeof (c));
   fd = open (filename, O_RDONLY);
@@ -382,17 +377,10 @@ main (int argc, char **argv)
   serv_addr.sin_port = htons (port);
   serv_addr.sin_addr = sin_addr;
 
-  fd = socket (PF_INET, SOCK_DGRAM, 0);
-  if (fd < 0)
-    {
-      fprintf (stderr, "Unable to open socket!\n");
-      exit (1);
-    }
-
-  thread = (pthread_t *) malloc (sizeof (pthread_t) * nthread);
-  thread_arg = (struct thread_arg *)
-    malloc (sizeof (struct thread_arg) * nthread);
-  assert (thread && thread_arg);
+  thread = (struct thread_info *)
+    malloc (sizeof (struct thread_info) * nthread);
+  assert (thread);
+  memset (thread, 0, sizeof (struct thread_info) * nthread);
 
   /* start point */
   if (keyx || keyy)
@@ -430,43 +418,49 @@ main (int argc, char **argv)
       printf ("keyx: %d keyy: %d\n", keyx, keyy);
     }
 
+  if (benchmark)
+    gettimeofday (&start, NULL);
+
   for (i = 0; i < nthread; i++)
     {
       int unit;
 
-      thread_arg[i].id = i;
-      thread_arg[i].fd = fd;
-      thread_arg[i].level = level;
-      thread_arg[i].filename = filename;
-      thread_arg[i].serv_addr = &serv_addr;
+      thread[i].id = i;
+      thread[i].fd = fd;
+      thread[i].level = level;
+      thread[i].filename = filename;
+      thread[i].serv_addr = &serv_addr;
 
       unit = nblock / nthread;
-      thread_arg[i].boffset = boffset + unit * i;
-      thread_arg[i].nblock = unit;
+      thread[i].boffset = boffset + unit * i;
+      thread[i].nblock = unit;
       if (i + 1 == nthread)
-        thread_arg[i].nblock += nblock % nthread;
+        thread[i].nblock += nblock % nthread;
 
-#if 0
-      if (rthread || wthread)
-        {
-          if (i < rthread)
-            pthread_create (&thread[i], NULL,
-                            thread_read, (void *) &thread_arg[i]);
-          else
-            pthread_create (&thread[i], NULL,
-                            thread_write, (void *) &thread_arg[i]);
-        }
-      else
-#endif
-        pthread_create (&thread[i], NULL,
-                        thread_read_write, (void *) &thread_arg[i]);
+      pthread_create (&thread[i].pthread, NULL,
+                      thread_read_write, (void *) &thread[i]);
     }
 
   for (i = 0; i < nthread; i++)
-    pthread_join (thread[i], NULL);
+    pthread_join (thread[i].pthread, NULL);
+
+  if (benchmark)
+    gettimeofday (&end, NULL);
+
+  memset (&stats, 0, sizeof (stats));
+  for (i = 0; i < nthread; i++)
+    horus_stats_merge (&stats, &thread[i].stats);
+  horus_stats_print (&stats);
+
+  if (benchmark)
+    {
+      timeval_sub (&end, &start, &res);
+      time = res.tv_sec + res.tv_usec * 0.000001;
+      printf ("horus benchmark: %llu keys in %f secs ( %f q/s\n",
+              stats.success, time, stats.success/time);
+    }
 
   free (thread);
-  free (thread_arg);
 
   return 0;
 }

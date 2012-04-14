@@ -7,12 +7,18 @@
 struct horus_stats {
   unsigned long long total;
   unsigned long long errors[HORUS_ERR_MAX];
+  unsigned long long sendfail;
+  unsigned long long sendretry;
+  unsigned long long recvfail;
+  unsigned long long recvretry;;
+  unsigned long long success;
+  unsigned long long giveup;
+  unsigned long long resmismatch;
 };
 
-void
-horus_stats_record (struct horus_stats *stats, int err, int suberr);
-void
-horus_stats_print (struct horus_stats *stats);
+void horus_stats_record (struct horus_stats *stats, int err, int suberr);
+void horus_stats_merge (struct horus_stats *res, struct horus_stats *delta);
+void horus_stats_print (struct horus_stats *stats);
 
 #endif /*_HORUS_STATS_H_*/
 

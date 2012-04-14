@@ -21,6 +21,19 @@
   } while (0)
 #endif /*timeval_sub*/
 
+#ifndef timeval_merge
+#define timeval_merge(res, delta)                     \
+  do {                                                \
+    (res)->tv_sec += (delta)->tv_sec;                 \
+    (res)->tv_usec += (delta)->tv_usec;               \
+    if ((res)->tv_usec >= 1000000)                    \
+      {                                               \
+        (res)->tv_usec -= 1000000;                    \
+        (res)->tv_sec++;                              \
+      }                                               \
+  } while (0)
+#endif /*timeval_merge*/
+
 #ifndef snprint_timeval
 #define snprint_timeval(buf,size,tv)                      \
   do {                                                    \

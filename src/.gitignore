@@ -10,4 +10,5 @@ horus-file
 
 kds_server
 kds_client
+kds_server_thpool
 
