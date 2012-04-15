@@ -23,19 +23,18 @@ extern int optreset;
 extern int horus_debug;
 extern int horus_verbose;
 
-const char *optstring = "bvdhn:s:p:x:y:o:l:";
+const char *optstring = "bvdhn:s:x:y:o:l:";
 const char *optusage = "\
 -b, --benchmark   Turn on benchmarking\n\
 -v, --verbose     Turn on verbose mode\n\
 -d, --debug       Turn on debugging mode\n\
 -h, --help        Display this help and exit\n\
 -n, --nthread     Specify the number of thread\n\
--s, --server      Specify server IP address (default: %s)\n\
--p, --port        Specify server UDP port (default: %d)\n\
+-s, --server      Specify server IP address A.B.C.D[:P] (default: %s:%d)\n\
 -x, --key-x       Specify x to calculate key K_x,y\n\
 -y, --key-y       Specify y to calculate key K_x,y\n\
--o, --offset      Specify file offset to access\n\
--l, --length      Specify size of the range to access (from offset)\n\
+-o, --offset      Specify file offset to access (e.g., 1G)\n\
+-l, --length      Specify size of the range to access (from offset) (e.g., 1G)\n\
 ";
 
 const struct option longopts[] = {
@@ -44,6 +43,7 @@ const struct option longopts[] = {
   { "debug",      no_argument,        NULL, 'd' },
   { "help",       no_argument,        NULL, 'h' },
   { "nthread",    required_argument,  NULL, 'n' },
+  { "server",     required_argument,  NULL, 's' },
   { "key-x",      required_argument,  NULL, 'x' },
   { "key-y",      required_argument,  NULL, 'y' },
   { "offset",     required_argument,  NULL, 'o' },
@@ -70,6 +70,7 @@ struct thread_info {
   u_int32_t boffset;
   int nblock;
   char *filename;
+  char *server;
   struct sockaddr_in *serv_addr;
   struct timeval timeval;
   struct horus_stats stats;
@@ -124,8 +125,9 @@ thread_read_write (void *arg)
   strncpy (kreq.filename, info->filename, sizeof (kreq.filename));
 
   if (benchmark || horus_verbose)
-    printf ("thread[%d]: block size: %d boffset %lu nblock %lu\n",
-            id, HORUS_BLOCK_SIZE, boffset, nblock);
+    printf ("thread[%d]: server %s:%d bsize %d boffset %lu nblock %lu\n",
+            id, info->server, ntohs (serv_addr->sin_port),
+            HORUS_BLOCK_SIZE, boffset, nblock);
 
   if (benchmark)
     gettimeofday (&start, NULL);
@@ -154,7 +156,6 @@ thread_read_write (void *arg)
               addrlen = sizeof (struct sockaddr_in);
               ret = recvfrom (fd, &kresp, sizeof (key_response_packet), 0,
                               (struct sockaddr *) &addr, &addrlen);
-              printf ("thread[%d]: recvfrom(): %d\n", id, ret);
               if (ret != sizeof (key_response_packet))
                 {
                   if (horus_verbose)
@@ -186,7 +187,8 @@ thread_read_write (void *arg)
       resy = ntohl (kresp.y);
 
       if (resx != reqx || resy != reqy)
-        info->stats.resmismatch++;
+        if (! (resx < reqx))
+          info->stats.resmismatch++;
 
       if (! benchmark)
         {
@@ -217,13 +219,10 @@ main (int argc, char **argv)
 {
   int fd;
   int ret, ch, i;
-  struct in_addr sin_addr;
-  u_int16_t port;
-  struct sockaddr_in serv_addr;
   int keyspec, keyx, keyy;
   unsigned long long offset, length;
   unsigned long boffset, nblock;
-  char *server = NULL, *filename = NULL;
+  char *filename = NULL;
   char *endptr;
   unsigned long level;
   unsigned long leaf_level = 0;
@@ -233,17 +232,19 @@ main (int argc, char **argv)
   struct timeval start, end, res;
   double time;
 
+  u_int16_t port;
+  char *portspec = NULL;
+  char *server[HORUS_MAX_SERVER_NUM];
+  struct sockaddr_in serv_addr[HORUS_MAX_SERVER_NUM];
+  int nservers = 0;
+
+  memset (&serv_addr, 0, sizeof (serv_addr));
+
   int nthread = 1;
 
   keyspec = 0;
   keyx = keyy = 0;
   offset = length = 0;
-
-  /* default setting */
-  server = HORUS_KDS_SERVER_ADDR;
-  ret = inet_pton (AF_INET, server, &sin_addr);
-  assert (ret == 1);
-  port = HORUS_KDS_SERVER_PORT;
 
   progname = (1 ? "kds_client" : argv[0]);
   while ((ch = getopt_long (argc, argv, optstring, longopts, NULL)) != -1)
@@ -268,21 +269,34 @@ main (int argc, char **argv)
             }
           break;
         case 's':
-          server = optarg;
-          ret = inet_pton (AF_INET, server, &sin_addr);
+          if (nservers >= HORUS_MAX_SERVER_NUM)
+            break;
+          server[nservers] = optarg;
+          portspec = index (optarg, ':');
+          if (portspec)
+            *portspec++ = '\0';
+          serv_addr[nservers].sin_family = AF_INET;
+          ret = inet_pton (AF_INET, server[nservers],
+                           &serv_addr[nservers].sin_addr);
           if (ret != 1)
             {
               fprintf (stderr, "invalid server address: %s\n", optarg);
               return -1;
             }
-          break;
-        case 'p':
-          port = (u_int16_t) strtol (optarg, &endptr, 0);
-          if (*endptr != '\0')
+          if (portspec)
             {
-              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
-              return -1;
+              port = (u_int16_t) strtol (portspec, &endptr, 0);
+              if (*endptr != '\0')
+                {
+                  fprintf (stderr, "invalid port number \'%c\' in %s\n",
+                           *endptr, portspec);
+                  return -1;
+                }
+              serv_addr[nservers].sin_port = htons (port);
             }
+          else
+            serv_addr[nservers].sin_port = htons (HORUS_KDS_SERVER_PORT);
+          nservers++;
           break;
         case 'x':
           keyx = strtol (optarg, &endptr, 0);
@@ -342,6 +356,19 @@ main (int argc, char **argv)
       exit (1);
     }
 
+  if (nservers == 0)
+    {
+      /* default setting */
+      server[nservers] = HORUS_KDS_SERVER_ADDR;
+      serv_addr[nservers].sin_family = AF_INET;
+      ret = inet_pton (AF_INET, server[nservers],
+                       &serv_addr[nservers].sin_addr);
+      assert (ret == 1);
+      port = HORUS_KDS_SERVER_PORT;
+      serv_addr[nservers].sin_port = htons (port);
+      nservers++;
+    }
+
   memset (&c, 0, sizeof (c));
   fd = open (filename, O_RDONLY);
   if (fd < 0)
@@ -371,11 +398,6 @@ main (int argc, char **argv)
       if (horus_verbose)
         printf ("leaf level: %lu\n", leaf_level);
     }
-
-  memset (&serv_addr, 0, sizeof (serv_addr));
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_port = htons (port);
-  serv_addr.sin_addr = sin_addr;
 
   thread = (struct thread_info *)
     malloc (sizeof (struct thread_info) * nthread);
@@ -429,7 +451,8 @@ main (int argc, char **argv)
       thread[i].fd = fd;
       thread[i].level = level;
       thread[i].filename = filename;
-      thread[i].serv_addr = &serv_addr;
+      thread[i].server = server[i % nservers];
+      thread[i].serv_addr = &serv_addr[i % nservers];
 
       unit = nblock / nthread;
       thread[i].boffset = boffset + unit * i;

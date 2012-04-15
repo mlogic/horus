@@ -2,6 +2,7 @@
 #ifndef _KDS_PROTOCOL_H_
 #define _KDS_PROTOCOL_H_
 
+#define HORUS_MAX_SERVER_NUM    8
 #define HORUS_KDS_SERVER_ADDR   "127.0.0.1"
 #define HORUS_KDS_SERVER_PORT   6666
 

@@ -20,13 +20,14 @@ extern int optreset;
 extern int horus_debug;
 extern int horus_verbose;
 
-const char *optstring = "bvdhn:";
+const char *optstring = "bvdhn:p:";
 const char *optusage = "\
 -b, --benchmark   Turn on benchmarking\n\
 -v, --verbose     Turn on verbose mode\n\
 -d, --debug       Turn on debugging mode\n\
 -h, --help        Display this help and exit\n\
 -n, --nthread     Specify the number of thread\n\
+-p, --port        Specify server UDP port (default: %d)\n\
 ";
 const struct option longopts[] = {
   { "benchmark",  no_argument,        NULL, 'b' },
@@ -34,6 +35,7 @@ const struct option longopts[] = {
   { "debug",      no_argument,        NULL, 'd' },
   { "help",       no_argument,        NULL, 'h' },
   { "nthread",    required_argument,  NULL, 'n' },
+  { "port",       required_argument,  NULL, 'p' },
   { NULL,         0,                  NULL,  0  }
 };
 
@@ -42,7 +44,8 @@ usage ()
 {
   printf ("Usage : %s [OPTION...]\n", progname);
   printf ("\n");
-  printf ("options are \n%s\n", optusage);
+  printf ("options are \n");
+  printf (optusage, HORUS_KDS_SERVER_PORT);
   printf ("Report bugs to %s\n", HORUS_BUG_ADDRESS);
   exit (0);
 }
@@ -160,8 +163,6 @@ kds_get_client_key (int id, struct in_addr *client,
   memcpy (kresp->key, key, key_len);
   kresp->key_len = htonl (key_len);
 
-  printf ("K_%d,%d response key_len: %d\n", kreqx, kreqy, key_len);
-
   return 0;
 }
 
@@ -244,6 +245,7 @@ main (int argc, char **argv)
   pthread_t *thread;
   struct thread_arg *thread_arg;
   int i;
+  u_int16_t port = HORUS_KDS_SERVER_PORT;
 
   progname = (1 ? "kds_server" : argv[0]);
   benchmark = 0;
@@ -268,6 +270,15 @@ main (int argc, char **argv)
               return -1;
             }
           break;
+        case 'p':
+          port = (u_int16_t) strtol (optarg, &endptr, 0);
+          if (*endptr != '\0')
+            {
+              fprintf (stderr, "invalid port number \'%c\' in %s\n",
+                       *endptr, optarg);
+              return -1;
+            }
+          break;
         default:
           usage ();
           break;
@@ -282,8 +293,7 @@ main (int argc, char **argv)
     malloc (sizeof (struct thread_arg) * nthread);
   assert (thread_arg);
 
-  fd = server_socket (PF_INET, SOCK_DGRAM,
-                      HORUS_KDS_SERVER_PORT, "kds_server_udp");
+  fd = server_socket (PF_INET, SOCK_DGRAM, port, "kds_server_udp");
   assert (fd >= 0);
 
 #if 0
