@@ -67,9 +67,32 @@ kds_get_client_key (int id, struct in_addr *client,
   kreqx = (u_int32_t) ntohl (kreq->x);
   kreqy = (u_int32_t) ntohl (kreq->y);
 
+  kresp->x = htonl (kreqx);
+  kresp->y = htonl (kreqy);
+
   if (horus_verbose)
     printf ("thread[%d]: requested: K_%d,%d file: %s\n",
             id, kreqx, kreqy, kreq->filename);
+
+  if (kreqx >= HORUS_MAX_KHT_DEPTH)
+    {
+      if (horus_verbose)
+        printf ("thread[%d]: kreq x: %lu out of max_kht_depth: %d\n",
+                id, (unsigned long) kreqx, HORUS_MAX_KHT_DEPTH);
+      kresp->err = htons (HORUS_ERR_REQ_OUT_OF_RANGE);
+      kresp->suberr = htons (EINVAL);
+      return 0;
+    }
+
+  if (kreqy >= 65536 * 256)
+    {
+      if (horus_verbose)
+        printf ("thread[%d]: kreq y: %lu out of range: %lu\n",
+                id, (unsigned long) kreqy, 65536LU * 256);
+      kresp->err = htons (HORUS_ERR_REQ_OUT_OF_RANGE);
+      kresp->suberr = htons (EINVAL);
+      return 0;
+    }
 
   fd = open (kreq->filename, O_RDONLY);
   if (fd < 0)
@@ -102,15 +125,6 @@ kds_get_client_key (int id, struct in_addr *client,
       return 0;
     }
 
-  if (kreqx >= HORUS_MAX_KHT_DEPTH)
-    {
-      if (horus_verbose)
-        printf ("thread[%d]: kreq x: %lu out of max_kht_depth: %d\n",
-                id, (unsigned long) kreqx, HORUS_MAX_KHT_DEPTH);
-      kresp->err = htons (HORUS_ERR_REQ_OUT_OF_RANGE);
-      kresp->suberr = htons (EINVAL);
-      return 0;
-    }
 #ifndef DISABLE_KEY_X_ADJUSTING
   if (c.kht_block_size[kreqx] == 0)
     {
@@ -155,8 +169,6 @@ kds_get_client_key (int id, struct in_addr *client,
     }
 
   /* send back the response */
-  kresp->x = htonl (kreqx);
-  kresp->y = htonl (kreqy);
   memcpy (kresp->filename, kreq->filename, sizeof (kresp->filename));
   kresp->err = htonl (0);
   memcpy (&kresp->kht_block_size, &c.kht_block_size,
@@ -197,10 +209,10 @@ handle_kds_client (void *arg)
       memset (&kreq, 0, sizeof (kreq));
       memset (&kresp, 0, sizeof (kresp));
 
-      pthread_mutex_lock (&kds_server_mutex);
+      //pthread_mutex_lock (&kds_server_mutex);
       ret = recvfrom (fd, &kreq, sizeof (kreq), 0,
                       (struct sockaddr *) &client, &client_len);
-      pthread_mutex_unlock (&kds_server_mutex);
+      //pthread_mutex_unlock (&kds_server_mutex);
 
       if (ret <= 0)
         {

@@ -23,13 +23,15 @@ extern int horus_debug;
 extern int horus_verbose;
 
 int benchmark = 0;
+int aggregate = 0;
+int simulate = 0;
 int spinwait = 0;
 useconds_t useconds = 0;
 long nanoseconds = 0;
 int nsend = 3;
 int nread = 10;
 
-const char *optstring = "hvdbn:s:x:y:o:l:wu:t:r:";
+const char *optstring = "hvdbn:s:x:y:o:l:a:ewu:t:r:";
 const char *optusage = "\
 -h, --help        Display this help and exit\n\
 -v, --verbose     Turn on verbose mode\n\
@@ -41,6 +43,8 @@ const char *optusage = "\
 -y, --key-y       Specify y to calculate key K_x,y\n\
 -o, --offset      Specify file offset to access (e.g., 1G)\n\
 -l, --length      Specify size of the range to access (from offset) (e.g., 1G)\n\
+-a, --aggregate   Specify the level of aggregation of request range keys\n\
+-e, --simulation  Turn on simulation mode of leaf key calculation\n\
 -w, --spinwait    Turn on spinning busy-wait mode\n\
 -u, --usleep      Specify the microseconds to sleep before read in spinwait\n\
 -t, --nanosleep   Specify the nanoseconds to sleep before read in spinwait\n\
@@ -58,6 +62,8 @@ const struct option longopts[] = {
   { "key-y",      required_argument,  NULL, 'y' },
   { "offset",     required_argument,  NULL, 'o' },
   { "length",     required_argument,  NULL, 'l' },
+  { "aggregate",  required_argument,  NULL, 'a' },
+  { "simulation", required_argument,  NULL, 'e' },
   { "spinwait",   no_argument,        NULL, 'w' },
   { "usleep",     required_argument,  NULL, 'u' },
   { "nanosleep",  required_argument,  NULL, 't' },
@@ -82,7 +88,10 @@ struct thread_info {
   int fd;
   u_int32_t level;
   u_int32_t boffset;
-  int nblock;
+  unsigned long nblock;
+  u_int32_t alevel;
+  u_int32_t aboffset;
+  unsigned long anblock;
   char *filename;
   char *server;
   struct sockaddr_in *serv_addr;
@@ -246,7 +255,7 @@ thread_read_write (void *arg)
       krespkeylen = (int) ntohl (kresp.key_len);
       horus_stats_record (&info->stats, kresperr, krespsuberr);
 
-      if (! benchmark)
+      if ((benchmark && horus_debug) || (! benchmark && horus_verbose))
         {
           if (kresperr)
             printf ("thread[%d]: err = %d : %s\n", id,
@@ -288,11 +297,12 @@ main (int argc, char **argv)
   int ret, ch, i;
   int keyspec, keyx, keyy;
   unsigned long long offset, length;
-  unsigned long boffset, nblock;
+  unsigned long level, boffset, nblock;
+  unsigned long  alevel, aboffset, anblock;
+  int branch;
   char *filename = NULL;
   char *endptr;
-  unsigned long level;
-  unsigned long leaf_level = 10;
+  unsigned long leaf_level = HORUS_DEFAULT_LEAF_LEVEL;
   struct horus_file_config c;
   int dumb_ass_mode = 0;
   struct horus_stats stats;
@@ -312,6 +322,7 @@ main (int argc, char **argv)
   keyspec = 0;
   keyx = keyy = 0;
   offset = length = 0;
+  level = boffset = nblock = 0;
 
   progname = (1 ? "kds_client" : argv[0]);
   while ((ch = getopt_long (argc, argv, optstring, longopts, NULL)) != -1)
@@ -399,6 +410,18 @@ main (int argc, char **argv)
               return -1;
             }
           break;
+        case 'a':
+          aggregate++;
+          alevel = strtol (optarg, &endptr, 0);
+          if (*endptr != '\0')
+            {
+              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
+              return -1;
+            }
+          break;
+        case 'e':
+          simulate++;
+          break;
         case 'w':
           spinwait++;
           break;
@@ -467,31 +490,30 @@ main (int argc, char **argv)
   fd = open (filename, O_RDONLY);
   if (fd < 0)
     {
-      if (horus_verbose)
-        printf ("cannot open file: without KHT config: %s\n", filename);
-    }
-  else
-    {
-      ret = horus_get_file_config (fd, &c);
-      if (ret < 0)
-        {
-          if (horus_verbose)
-            printf ("cannot read config: without KHT config: %s\n",
-                    filename);
-        }
-      close (fd);
+      printf ("cannot open file: %s\n", filename);
+      exit (1);
     }
 
-  if (horus_is_valid_config (&c))
+  ret = horus_get_file_config (fd, &c);
+  if (ret < 0)
     {
-      //block_size = HORUS_BLOCK_SIZE;
-      for (i = 0; i < HORUS_MAX_KHT_DEPTH; i++)
-        if (c.kht_block_size[i])
-          leaf_level = i;
-
-      if (horus_verbose)
-        printf ("leaf level: %lu\n", leaf_level);
+      printf ("cannot read Horus config: %s\n", filename);
+      exit (1);
     }
+  close (fd);
+
+  if (! horus_is_valid_config (&c))
+    {
+      printf ("invalid Horus config: %s\n", filename);
+      exit (1);
+    }
+
+  /* calculate leaf level */
+  for (i = 0; i < HORUS_MAX_KHT_DEPTH; i++)
+    if (c.kht_block_size[i])
+      leaf_level = i;
+  if (horus_verbose)
+    printf ("leaf level: %lu\n", leaf_level);
 
   thread = (struct thread_info *)
     malloc (sizeof (struct thread_info) * nthread);
@@ -499,17 +521,17 @@ main (int argc, char **argv)
   memset (thread, 0, sizeof (struct thread_info) * nthread);
 
   /* start point */
-  if (keyspec)
-    {
-      level = keyx;
-      if (horus_is_valid_config (&c) && leaf_level < level)
-        level = leaf_level;
-      boffset = keyy;
-    }
-  else
+  if (offset)
     {
       level = leaf_level;
       boffset = (offset ? offset / HORUS_BLOCK_SIZE : 0);
+    }
+
+  /* when key is specified (override the start point by offset) */
+  if (keyspec)
+    {
+      level = keyx;
+      boffset = keyy;
     }
 
   /* length */
@@ -517,12 +539,33 @@ main (int argc, char **argv)
   if (length)
     nblock = length / HORUS_BLOCK_SIZE;
 
-  /* dumb-ass mode */
-  if (dumb_ass_mode)
+  /* when key is specified (override the length) */
+  if (keyspec && simulate)
     {
-      if (keyspec && horus_is_valid_config (&c))
-        nblock = c.kht_block_size[level];
-      level = leaf_level;
+      nblock = 1;
+      for (level = keyx; level < leaf_level; level++)
+        {
+          branch = c.kht_block_size[level] / c.kht_block_size[level + 1];
+          boffset *= branch;
+          nblock *= branch;
+        }
+      if (horus_verbose)
+        printf ("range by key spec: K_%d,%d leaf: K_%lu,%lu nblock: %lu\n",
+                keyx, keyy, level, boffset, nblock);
+    }
+
+  /* aggregate */
+  if (aggregate)
+    {
+      /* calculate range as the aggregate level */
+      aboffset = boffset;
+      anblock = nblock;
+      for (i = level; alevel < i; i--)
+        {
+          branch = c.kht_block_size[i - 1] / c.kht_block_size[i];
+          aboffset /= branch;
+          anblock /= branch;
+        }
     }
 
   if (horus_verbose)
@@ -532,8 +575,13 @@ main (int argc, char **argv)
         printf ("benchmark: ");
       if (dumb_ass_mode)
         printf ("dumb-ass: ");
-      printf ("level: %lu boffset: %lu nblock: %lu\n", level, boffset, nblock);
-      printf ("keyx: %d keyy: %d\n", keyx, keyy);
+      if (keyspec)
+        printf ("keyx: %d keyy: %d\n", keyx, keyy);
+      printf ("level: %lu boffset: %lu nblock: %lu\n",
+              level, boffset, nblock);
+      if (aggregate)
+        printf ("alevel: %lu aboffset: %lu anblock: %lu\n",
+                alevel, aboffset, anblock);
     }
 
   if (benchmark)
@@ -545,16 +593,26 @@ main (int argc, char **argv)
 
       thread[i].id = i;
       thread[i].fd = fd;
-      thread[i].level = level;
       thread[i].filename = filename;
       thread[i].server = server[i % nservers];
       thread[i].serv_addr = &serv_addr[i % nservers];
 
+      thread[i].level = level;
       unit = nblock / nthread;
       thread[i].boffset = boffset + unit * i;
       thread[i].nblock = unit;
       if (i + 1 == nthread)
         thread[i].nblock += nblock % nthread;
+
+      if (aggregate)
+        {
+          thread[i].level = alevel;
+          unit = anblock / nthread;
+          thread[i].boffset = aboffset + unit * i;
+          thread[i].nblock = unit;
+          if (i + 1 == nthread)
+            thread[i].nblock += anblock % nthread;
+        }
 
       pthread_create (&thread[i].pthread, NULL,
                       thread_read_write, (void *) &thread[i]);

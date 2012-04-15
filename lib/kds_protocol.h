@@ -10,6 +10,7 @@
 #define HORUS_MAX_KHT_DEPTH     16
 #define HORUS_MAX_KEY_LEN       41
 #define HORUS_MAX_FILENAME_LEN  256
+#define HORUS_DEFAULT_LEAF_LEVEL 15
 
 #define HORUS_ERR_NONE              0
 #define HORUS_ERR_OPEN              1
