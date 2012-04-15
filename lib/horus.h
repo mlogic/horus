@@ -44,6 +44,9 @@
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
 
+#undef PARENT_KEY_STRING_CONVERSION
+#undef STRING_MESSAGE
+
 #define HORUS_BLOCK_SIZE 4096
 #define HORUS_KEY_LEN    (160/8)
 

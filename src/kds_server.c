@@ -65,7 +65,7 @@ kds_get_client_key (int id, struct in_addr *client,
   kreqy = (u_int32_t) ntohl (kreq->y);
 
   if (horus_verbose)
-    printf ("thread[%d]: request: K_%d,%d file: %s\n",
+    printf ("thread[%d]: requested: K_%d,%d file: %s\n",
             id, kreqx, kreqy, kreq->filename);
 
   fd = open (kreq->filename, O_RDONLY);
@@ -159,6 +159,8 @@ kds_get_client_key (int id, struct in_addr *client,
           sizeof (c.kht_block_size));
   memcpy (kresp->key, key, key_len);
   kresp->key_len = htonl (key_len);
+
+  printf ("K_%d,%d response key_len: %d\n", kreqx, kreqy, key_len);
 
   return 0;
 }

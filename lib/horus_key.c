@@ -88,12 +88,15 @@ key_val2str (char *buf, int size, char *key, int key_len)
 
   if (size - len > 0)
     buf[len] = '\0';
+  else
+    buf[size - 1] = '\0';
 }
 
 char *
 print_key (char *key, int key_len)
 {
-  static char buf[SHA_DIGEST_LENGTH * 2 + 1];
+  static char buf[128];
+  memset (buf, 0, sizeof (buf));
   key_val2str (buf, sizeof (buf), key, key_len);
   return buf;
 }
@@ -101,34 +104,34 @@ print_key (char *key, int key_len)
 /* K_{x,y} = KH(K_{parent},x||y) */
 char *
 block_key (char *key, size_t *key_len,
-           char *parent, int parent_len, int x, int y)
+           char *pkey, int pkey_len, int x, int y)
 {
   void *message;
   int size;
-#ifndef __APPLE__
   unsigned int out_key_len;
-#endif /*__APPLE__*/
+  char *parent = pkey;
+  int parent_len = pkey_len;
 
   /* The message x||y */
   assert (x < 256);
   assert (y < 65536 * 256);
   /* Currently we are using string messages for SHA1. */
-#undef NON_STRING_MESSAGE
-#ifdef NON_STRING_MESSAGE
-  u_int32_t x__y = ((x << 24) | y);
-  message = &x__y;
-  size = sizeof (x__y);
-#else /*NON_STRING_MESSAGE*/
+#ifdef STRING_MESSAGE
   char x__y[17];
   message = x__y;
   size = sizeof (x__y) - 1;
   snprintf (x__y, sizeof (x__y), "%016x", ((x << 24) | y));
-#endif /*NON_STRING_MESSAGE*/
+#else /*STRING_MESSAGE*/
+  u_int32_t x__y = ((x << 24) | y);
+  message = &x__y;
+  size = sizeof (x__y);
+#endif /*STRING_MESSAGE*/
 
 #ifdef __APPLE__
   CCHmac (kCCHmacAlgSHA1, parent, parent_len,
           (const void *)message, size, key);
-  *key_len = SHA_DIGEST_LENGTH;
+  out_key_len = SHA_DIGEST_LENGTH;
+  *key_len = (size_t)out_key_len;
 #else /*__APPLE__*/
   /* HMAC outputs a uint to out_key_len, need to convert it to size_t
      for key_len */
@@ -140,10 +143,17 @@ block_key (char *key, size_t *key_len,
 
   if (debug || horus_debug)
     {
-      printf ("parent = %s\n", print_key (parent, parent_len));
-      printf ("x: %d, y: %d, message: %s, size: %d\n", x, y, x__y, size);
-      printf ("message = %s\n", print_key (x__y, size));
-      printf ("key = %s\n", print_key (key, *key_len));
+      printf ("%s: K_p = 0x%s (len: %d)\n",
+              __func__, print_key (parent, parent_len), parent_len);
+#ifdef STRING_MESSAGE
+      printf ("%s: message(x||y): (%d||%d): \"%s\" (0x%s) (len: %d)\n",
+              __func__, x, y, x__y, print_key (x__y, size), size);
+#else /*STRING_MESSAGE*/
+      printf ("%s: message(x||y): (%d||%d): %#010x (len: %d)\n",
+              __func__, x, y, x__y, size);
+#endif /*STRING_MESSAGE*/
+      printf ("%s: K_%d,%d = 0x%s (len: %d)\n",
+              __func__, x, y, print_key (key, *key_len), (int) *key_len);
     }
 
   return key;
@@ -160,15 +170,16 @@ horus_block_key (char *k, size_t *klen, int kx, int ky,
   int branch;
   int xstack[HORUS_MAX_KHT_DEPTH];
   int ystack[HORUS_MAX_KHT_DEPTH];
+#ifdef PARENT_KEY_STRING_CONVERSION
+  char str_kp[SHA_DIGEST_LENGTH * 2 + 1];
+#endif /*PARENT_KEY_STRING_CONVERSION*/
 
   char tmp_k[SHA_DIGEST_LENGTH * 2 + 1];
   char tmp_kp[SHA_DIGEST_LENGTH * 2 + 1];
   size_t tmp_klen, tmp_kplen;
 
-  char str_k[SHA_DIGEST_LENGTH * 2 + 1];
-
   if (horus_debug)
-    printf ("%s(): kx = %d, ky = %d, kpx = %d, kpy = %d\n",
+    printf ("%s: kx = %d, ky = %d, kpx = %d, kpy = %d\n",
             __func__, kx, ky, kpx, kpy);
 
   assert (kx < HORUS_MAX_KHT_DEPTH);
@@ -178,10 +189,7 @@ horus_block_key (char *k, size_t *klen, int kx, int ky,
   memset (xstack, 0, sizeof (xstack));
   memset (ystack, 0, sizeof (ystack));
 
-  memcpy (tmp_kp, kp, MIN (sizeof (tmp_kp), kplen));
-  tmp_kplen = kplen;
-
-  /* Go up KHT remembering the x,y in the stack */
+  /* Go up KHT recording each (x,y)s in the stack */
   i = 0;
   x = kx;
   y = ky;
@@ -200,6 +208,10 @@ horus_block_key (char *k, size_t *klen, int kx, int ky,
   assert (x == kpx);
   assert (y == kpy); // Otherwise, outside of the parent range.
 
+  /* init Kp */
+  memcpy (tmp_kp, kp, MIN (sizeof (tmp_kp), kplen));
+  tmp_kplen = kplen;
+
   /* Go down KHT back to the requested key */
   while (i > 0)
     {
@@ -214,13 +226,12 @@ horus_block_key (char *k, size_t *klen, int kx, int ky,
       memcpy (tmp_kp, tmp_k, sizeof (tmp_k));
       tmp_kplen = tmp_klen;
 
+#ifdef PARENT_KEY_STRING_CONVERSION
       /* Kp = str(Kp) */
-      key_val2str (str_k, sizeof (str_k), tmp_kp, tmp_kplen);
-      memcpy (tmp_kp, str_k, sizeof (tmp_kp));
-      tmp_kplen = strlen (str_k);
-
-      if (horus_verbose)
-        printf ("K_%d,%d = %s\n", x, y, tmp_kp);
+      key_val2str (str_kp, sizeof (str_kp), tmp_kp, tmp_kplen);
+      memcpy (tmp_kp, str_kp, sizeof (tmp_kp));
+      tmp_kplen = strlen (str_kp);
+#endif
     }
 
   assert (x == kx && y == ky);
@@ -239,53 +250,58 @@ horus_key_by_master (char *key, size_t *key_len, int x, int y,
 {
   char k0[SHA_DIGEST_LENGTH * 2 + 1];
   size_t k0len;
-  int xk0, yk0;
-  char str_k0[SHA_DIGEST_LENGTH * 2 + 1];
-  int tk, ty;
+  int k0x, k0y;
   int branch;
+#ifdef PARENT_KEY_STRING_CONVERSION
+  char str_kp[SHA_DIGEST_LENGTH * 2 + 1];
+#endif /*PARENT_KEY_STRING_CONVERSION*/
 
   if (horus_debug)
-    printf ("%s(): x = %d, y = %d\n", __func__, x, y);
+    printf ("%s: x = %d, y = %d\n", __func__, x, y);
 
   if (x >= HORUS_MAX_KHT_DEPTH)
     {
-      printf ("%s(): x: out of range: %d\n", __func__, x);
+      printf ("%s: x: out of range: %d\n", __func__, x);
       return -1;
     }
 
   if (kht_block_size[x] == 0)
     {
-      printf ("%s(): zero block size level: x: %d\n", __func__, x);
+      printf ("%s: zero block size level: x: %d\n", __func__, x);
       return -1;
     }
 
-  tk = x;
-  ty = y;
-  while (tk > 0)
+  k0x = x;
+  k0y = y;
+  while (k0x > 0)
     {
-      branch = kht_block_size[tk - 1] / kht_block_size[tk];
-      tk -= 1;
-      ty /= branch;
+      branch = kht_block_size[k0x - 1] / kht_block_size[k0x];
+      k0x --;
+      k0y /= branch;
     }
+  assert (k0x == 0);
 
-  xk0 = tk;
-  yk0 = ty;
-  assert (xk0 == 0);
+  block_key (k0, &k0len, master, (size_t) master_len, k0x, k0y);
 
-  block_key (k0, &k0len, master, (size_t) master_len, xk0, yk0);
+  if (horus_debug)
+    printf ("%s: K_0,0 (len: %d) = %s\n",
+            __func__, (int) k0len, print_key (k0, k0len));
 
-  key_val2str (str_k0, sizeof (str_k0), k0, k0len);
-  memcpy (k0, str_k0, sizeof (k0));
-  k0len = strlen (str_k0);
-
-  if (xk0 == x)
+  if (k0x == x)
     {
-      memcpy (key, k0, sizeof (key));
+      memcpy (key, k0, *key_len);
       *key_len = k0len;
     }
   else
     {
-      horus_block_key (key, key_len, x, y, k0, k0len, xk0, yk0,
+#ifdef PARENT_KEY_STRING_CONVERSION
+      /* Kp = str(Kp) */
+      key_val2str (str_kp, sizeof (str_kp), k0, k0len);
+      memcpy (k0, str_kp, sizeof (k0));
+      k0len = strlen (str_kp);
+#endif /*PARENT_KEY_STRING_CONVERSION*/
+
+      horus_block_key (key, key_len, x, y, k0, k0len, k0x, k0y,
                        kht_block_size);
     }
 

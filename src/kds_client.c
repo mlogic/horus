@@ -154,6 +154,7 @@ thread_read_write (void *arg)
               addrlen = sizeof (struct sockaddr_in);
               ret = recvfrom (fd, &kresp, sizeof (key_response_packet), 0,
                               (struct sockaddr *) &addr, &addrlen);
+              printf ("thread[%d]: recvfrom(): %d\n", id, ret);
               if (ret != sizeof (key_response_packet))
                 {
                   if (horus_verbose)
@@ -196,8 +197,8 @@ thread_read_write (void *arg)
             printf ("thread[%d]: suberr = %d : %s\n", id,
                     krespsuberr, strerror (krespsuberr));
           if (! kresperr)
-            printf ("thread[%d]: key_%d,%d: key_%d,%d = %s\n", id,
-                    reqx, reqy, resx, resy,
+            printf ("thread[%d]: key_%d,%d: key_%d,%d/%d = %s\n", id,
+                    reqx, reqy, resx, resy, krespkeylen,
                     print_key (kresp.key, krespkeylen));
         }
     }
@@ -219,7 +220,7 @@ main (int argc, char **argv)
   struct in_addr sin_addr;
   u_int16_t port;
   struct sockaddr_in serv_addr;
-  int keyx, keyy;
+  int keyspec, keyx, keyy;
   unsigned long long offset, length;
   unsigned long boffset, nblock;
   char *server = NULL, *filename = NULL;
@@ -232,8 +233,9 @@ main (int argc, char **argv)
   struct timeval start, end, res;
   double time;
 
-  int nthread = 0;
+  int nthread = 1;
 
+  keyspec = 0;
   keyx = keyy = 0;
   offset = length = 0;
 
@@ -289,6 +291,7 @@ main (int argc, char **argv)
               fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
               return -1;
             }
+          keyspec++;
           break;
         case 'y':
           keyy = strtol (optarg, &endptr, 0);
@@ -297,6 +300,7 @@ main (int argc, char **argv)
               fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
               return -1;
             }
+          keyspec++;
           break;
         case 'o':
           offset = canonical_byte_size (optarg, &endptr);
@@ -332,13 +336,9 @@ main (int argc, char **argv)
   if (! filename)
     usage ();
 
-  if (nthread == 0)
-    nthread = 1;
-
-  assert (nthread > 0);
-  if (nthread > HORUS_THREAD_MAX)
+  if (nthread < 1 || HORUS_THREAD_MAX < nthread)
     {
-      printf ("max #threads: %d\n", HORUS_THREAD_MAX);
+      printf ("#threads must be: 1 - %d\n", HORUS_THREAD_MAX);
       exit (1);
     }
 
@@ -383,7 +383,7 @@ main (int argc, char **argv)
   memset (thread, 0, sizeof (struct thread_info) * nthread);
 
   /* start point */
-  if (keyx || keyy)
+  if (keyspec)
     {
       level = keyx;
       boffset = keyy;
@@ -402,7 +402,7 @@ main (int argc, char **argv)
   /* dumb-ass mode */
   if (dumb_ass_mode)
     {
-      if (horus_is_valid_config (&c) && (keyx || keyy))
+      if (keyspec && horus_is_valid_config (&c))
         nblock = c.kht_block_size[level];
       level = leaf_level;
     }
