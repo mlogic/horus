@@ -18,8 +18,9 @@
 #define HORUS_ERR_NO_SUCH_CLIENT    4
 #define HORUS_ERR_REQ_OUT_OF_RANGE  5
 #define HORUS_ERR_REQ_NOT_ALLOWED   6
-#define HORUS_ERR_UNKNOWN           7
-#define HORUS_ERR_MAX               8
+#define HORUS_ERR_X_ADJUSTING       7
+#define HORUS_ERR_UNKNOWN           8
+#define HORUS_ERR_MAX               9
 
 struct key_request_packet
 {

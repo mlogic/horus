@@ -20,20 +20,20 @@ extern int optreset;
 extern int horus_debug;
 extern int horus_verbose;
 
-const char *optstring = "bvdhn:p:";
+const char *optstring = "hvdbn:p:";
 const char *optusage = "\
--b, --benchmark   Turn on benchmarking\n\
+-h, --help        Display this help and exit\n\
 -v, --verbose     Turn on verbose mode\n\
 -d, --debug       Turn on debugging mode\n\
--h, --help        Display this help and exit\n\
+-b, --benchmark   Turn on benchmarking\n\
 -n, --nthread     Specify the number of thread\n\
 -p, --port        Specify server UDP port (default: %d)\n\
 ";
 const struct option longopts[] = {
-  { "benchmark",  no_argument,        NULL, 'b' },
+  { "help",       no_argument,        NULL, 'h' },
   { "verbose",    no_argument,        NULL, 'v' },
   { "debug",      no_argument,        NULL, 'd' },
-  { "help",       no_argument,        NULL, 'h' },
+  { "benchmark",  no_argument,        NULL, 'b' },
   { "nthread",    required_argument,  NULL, 'n' },
   { "port",       required_argument,  NULL, 'p' },
   { NULL,         0,                  NULL,  0  }
@@ -119,6 +119,7 @@ kds_get_client_key (int id, struct in_addr *client,
       do {
         kreqx--;
       } while (kreqx > 0 && c.kht_block_size[kreqx] == 0);
+      kresp->err = htons (HORUS_ERR_X_ADJUSTING);
     }
 #endif /*DISABLE_KEY_X_ADJUSTING*/
   if (c.kht_block_size[kreqx] == 0)
@@ -253,14 +254,14 @@ main (int argc, char **argv)
     {
       switch (ch)
         {
-        case 'b':
-          benchmark++;
-          break;
         case 'v':
           horus_verbose++;
           break;
         case 'd':
           horus_debug++;
+          break;
+        case 'b':
+          benchmark++;
           break;
         case 'n':
           nthread = (int) strtol (optarg, &endptr, 0);

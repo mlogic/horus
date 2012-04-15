@@ -1,4 +1,5 @@
 
+#include <stdio.h>
 #include <sys/types.h>
 #include <kds_protocol.h>
 #include <horus_stats.h>
@@ -41,6 +42,7 @@ horus_stats_print (struct horus_stats *stats)
   printf (" enosuchclient: %llu", stats->errors[HORUS_ERR_NO_SUCH_CLIENT]);
   printf (" ereqoutofrange: %llu", stats->errors[HORUS_ERR_REQ_OUT_OF_RANGE]);
   printf (" ereqnotallowed: %llu", stats->errors[HORUS_ERR_REQ_NOT_ALLOWED]);
+  printf (" eajustedx: %llu", stats->errors[HORUS_ERR_X_ADJUSTING]);
   printf (" eunknown: %llu", stats->errors[HORUS_ERR_UNKNOWN]);
   printf ("\n");
   printf (" sendfail: %llu", stats->sendfail);

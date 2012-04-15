@@ -12,6 +12,7 @@ char *horus_error_strings [] = {
   "horus: no such client",
   "horus: request out of range",
   "horus: request not allowed",
+  "horus: adjusted x",
   "horus: unknown error",
 };
 

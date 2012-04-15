@@ -10,7 +10,6 @@
 
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
 char *progname;
-int benchmark = 0;
 
 struct thread_info *thread = NULL;
 
@@ -23,31 +22,46 @@ extern int optreset;
 extern int horus_debug;
 extern int horus_verbose;
 
-const char *optstring = "bvdhn:s:x:y:o:l:";
+int benchmark = 0;
+int spinwait = 0;
+useconds_t useconds = 0;
+long nanoseconds = 0;
+int nsend = 3;
+int nread = 10;
+
+const char *optstring = "hvdbn:s:x:y:o:l:wu:t:r:";
 const char *optusage = "\
--b, --benchmark   Turn on benchmarking\n\
+-h, --help        Display this help and exit\n\
 -v, --verbose     Turn on verbose mode\n\
 -d, --debug       Turn on debugging mode\n\
--h, --help        Display this help and exit\n\
+-b, --benchmark   Turn on benchmarking\n\
 -n, --nthread     Specify the number of thread\n\
 -s, --server      Specify server IP address A.B.C.D[:P] (default: %s:%d)\n\
 -x, --key-x       Specify x to calculate key K_x,y\n\
 -y, --key-y       Specify y to calculate key K_x,y\n\
 -o, --offset      Specify file offset to access (e.g., 1G)\n\
 -l, --length      Specify size of the range to access (from offset) (e.g., 1G)\n\
+-w, --spinwait    Turn on spinning busy-wait mode\n\
+-u, --usleep      Specify the microseconds to sleep before read in spinwait\n\
+-t, --nanosleep   Specify the nanoseconds to sleep before read in spinwait\n\
+-r, --reread      Specify the times to retry read\n\
 ";
 
 const struct option longopts[] = {
-  { "benchmark",  no_argument,        NULL, 'b' },
+  { "help",       no_argument,        NULL, 'h' },
   { "verbose",    no_argument,        NULL, 'v' },
   { "debug",      no_argument,        NULL, 'd' },
-  { "help",       no_argument,        NULL, 'h' },
+  { "benchmark",  no_argument,        NULL, 'b' },
   { "nthread",    required_argument,  NULL, 'n' },
   { "server",     required_argument,  NULL, 's' },
   { "key-x",      required_argument,  NULL, 'x' },
   { "key-y",      required_argument,  NULL, 'y' },
   { "offset",     required_argument,  NULL, 'o' },
   { "length",     required_argument,  NULL, 'l' },
+  { "spinwait",   no_argument,        NULL, 'w' },
+  { "usleep",     required_argument,  NULL, 'u' },
+  { "nanosleep",  required_argument,  NULL, 't' },
+  { "reread",     required_argument,  NULL, 'r' },
   { NULL,         0,                  NULL,  0  }
 };
 
@@ -98,11 +112,10 @@ thread_read_write (void *arg)
 
   struct timeval start, end, res;
   double time;
-  int success, resend, reread;
-  const int nresend = 2, nreread = 2;
+  int success;
+  unsigned long send_count, read_count;
 
   id = info->id;
-  fd = info->fd;
 
   memset (&info->stats, 0, sizeof (struct horus_stats));
 
@@ -113,7 +126,6 @@ thread_read_write (void *arg)
               id, strerror (errno));
       return NULL;
     }
-  //fcntl (fd, F_SETFL, O_NONBLOCK);
 
   serv_addr = info->serv_addr;
   boffset = info->boffset;
@@ -129,6 +141,14 @@ thread_read_write (void *arg)
             id, info->server, ntohs (serv_addr->sin_port),
             HORUS_BLOCK_SIZE, boffset, nblock);
 
+  if (spinwait)
+    {
+      fcntl (fd, F_SETFL, O_NONBLOCK);
+      printf ("thread[%d]: spinwait: usleep %d nanosleep %ld "
+              "nsend %d nread %d\n",
+              id, useconds, nanoseconds, nsend, nread);
+    }
+
   if (benchmark)
     gettimeofday (&start, NULL);
 
@@ -138,41 +158,84 @@ thread_read_write (void *arg)
       kreq.y = htonl (reqy);
 
       success = 0;
-      resend = nresend;
+      send_count = nsend;
       do {
           ret = sendto (fd, &kreq, sizeof (key_request_packet), 0,
                         (struct sockaddr *) serv_addr,
                         sizeof (struct sockaddr_in));
+          send_count--;
           if (ret != sizeof (key_request_packet))
             {
-              if (horus_verbose)
-                printf ("thread[%d]: sendto(): failed: %d, skip\n", id, ret);
+              if (horus_debug)
+                printf ("thread[%d]: sendto(): failed: %d "
+                        "send_count: %ld\n", id, ret, send_count);
               info->stats.sendfail++;
               continue;
             }
+          else
+            {
+              if (horus_debug)
+                printf ("thread[%d]: request %d,%d send_count: %ld\n",
+                        id, reqx, reqy, send_count);
+            }
 
-          reread = nreread;
+          read_count = nread;
           do {
+              if (spinwait)
+                {
+                  if (useconds)
+                    usleep (useconds);
+                  if (nanoseconds)
+                    {
+                      struct timespec nanospec;
+                      nanospec.tv_sec = 0;
+                      nanospec.tv_nsec = nanoseconds;
+                      nanosleep (&nanospec, NULL);
+                    }
+                }
+
               addrlen = sizeof (struct sockaddr_in);
               ret = recvfrom (fd, &kresp, sizeof (key_response_packet), 0,
                               (struct sockaddr *) &addr, &addrlen);
+              read_count--;
               if (ret != sizeof (key_response_packet))
                 {
-                  if (horus_verbose)
-                    printf ("thread[%d]: recvfrom(): failed: %d\n", id, ret);
+                  if (horus_debug)
+                    printf ("thread[%d]: recvfrom(): failed: %d "
+                            "read_count: %ld\n", id, ret, read_count);
                   info->stats.recvfail++;
                   continue;
                 }
               else
-                success++;
-          } while (! success && reread--);
-      } while (! success && resend--);
+                {
+                  if (horus_debug)
+                    printf ("thread[%d]: recvfrom(): received %d\n", id, ret);
 
-      info->stats.sendretry += nresend - resend;
-      info->stats.recvretry += nreread - reread;
+                  resx = ntohl (kresp.x);
+                  resy = ntohl (kresp.y);
+
+                  if (resx == reqx && resy == reqy)
+                    success++;
+                  else
+                    {
+                      if (horus_debug)
+                        printf ("thread[%d]: mismatch: "
+                                "req: %d,%d: resp: %d,%d\n",
+                                id, reqx, reqy, resx, resy);
+                      info->stats.resmismatch++;
+                    }
+                }
+          } while (! success && read_count > 0);
+      } while (! success && send_count > 0);
+
+      info->stats.sendretry += nsend - send_count - 1;
+      info->stats.recvretry += nread - read_count - 1;
 
       if (! success)
         {
+          if (horus_verbose)
+            printf ("thread[%d]: give up K_%d,%d: resend: %lu reread: %lu\n",
+                    id, reqx, reqy, send_count, read_count);
           info->stats.giveup++;
           continue;
         }
@@ -182,13 +245,6 @@ thread_read_write (void *arg)
       krespsuberr = (int) ntohs (kresp.suberr);
       krespkeylen = (int) ntohl (kresp.key_len);
       horus_stats_record (&info->stats, kresperr, krespsuberr);
-
-      resx = ntohl (kresp.x);
-      resy = ntohl (kresp.y);
-
-      if (resx != reqx || resy != reqy)
-        if (! (resx < reqx))
-          info->stats.resmismatch++;
 
       if (! benchmark)
         {
@@ -205,11 +261,22 @@ thread_read_write (void *arg)
         }
     }
 
+  if (benchmark)
+    gettimeofday (&end, NULL);
+
   close (fd);
 
-  if (! benchmark && horus_verbose)
-    printf ("thread[%d]: %llu keys processed.\n",
-            id, info->stats.success);
+  if (benchmark)
+    {
+      timeval_sub (&end, &start, &res);
+      time = res.tv_sec + res.tv_usec * 0.000001;
+      info->timeval = res;
+      printf ("thread[%d]: %llu/%lu keys in %f secs ( %f q/s\n",
+              id, info->stats.success, nblock, time, info->stats.success/time);
+    }
+  else if (horus_verbose)
+    printf ("thread[%d]: %llu/%lu keys processed.\n",
+            id, info->stats.success, nblock);
 
   return NULL;
 }
@@ -225,7 +292,7 @@ main (int argc, char **argv)
   char *filename = NULL;
   char *endptr;
   unsigned long level;
-  unsigned long leaf_level = 0;
+  unsigned long leaf_level = 10;
   struct horus_file_config c;
   int dumb_ass_mode = 0;
   struct horus_stats stats;
@@ -251,14 +318,14 @@ main (int argc, char **argv)
     {
       switch (ch)
         {
-        case 'b':
-          benchmark++;
-          break;
         case 'v':
           horus_verbose++;
           break;
         case 'd':
           horus_debug++;
+          break;
+        case 'b':
+          benchmark++;
           break;
         case 'n':
           nthread = (int) strtol (optarg, &endptr, 0);
@@ -326,6 +393,33 @@ main (int argc, char **argv)
           break;
         case 'l':
           length = canonical_byte_size (optarg, &endptr);
+          if (*endptr != '\0')
+            {
+              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
+              return -1;
+            }
+          break;
+        case 'w':
+          spinwait++;
+          break;
+        case 'u':
+          useconds = (useconds_t) strtol (optarg, &endptr, 0);
+          if (*endptr != '\0')
+            {
+              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
+              return -1;
+            }
+          break;
+        case 't':
+          nanoseconds = (long) strtol (optarg, &endptr, 0);
+          if (*endptr != '\0')
+            {
+              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
+              return -1;
+            }
+          break;
+        case 'r':
+          nread = (int) strtol (optarg, &endptr, 0);
           if (*endptr != '\0')
             {
               fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
@@ -408,6 +502,8 @@ main (int argc, char **argv)
   if (keyspec)
     {
       level = keyx;
+      if (horus_is_valid_config (&c) && leaf_level < level)
+        level = leaf_level;
       boffset = keyy;
     }
   else
@@ -479,8 +575,22 @@ main (int argc, char **argv)
     {
       timeval_sub (&end, &start, &res);
       time = res.tv_sec + res.tv_usec * 0.000001;
-      printf ("horus benchmark: %llu keys in %f secs ( %f q/s\n",
+      printf ("horus benchmark1: %llu keys in %f secs by %f q/s\n",
               stats.success, time, stats.success/time);
+    }
+
+  if (benchmark)
+    {
+      double qps = 0.0;
+      unsigned long long total = 0;
+      for (i = 0; i < nthread; i++)
+        {
+          time = thread[i].timeval.tv_sec +
+                 thread[i].timeval.tv_usec * 0.000001;
+          total += thread[i].stats.success;
+          qps += thread[i].stats.success / time;
+        }
+      printf ("horus benchmark2: %llu keys by %f q/s\n", total, qps);
     }
 
   free (thread);
