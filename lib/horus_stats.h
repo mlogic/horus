@@ -14,6 +14,7 @@ struct horus_stats {
   unsigned long long success;
   unsigned long long giveup;
   unsigned long long resmismatch;
+  unsigned long long keycalculated;
 };
 
 void horus_stats_record (struct horus_stats *stats, int err, int suberr);

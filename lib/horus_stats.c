@@ -28,6 +28,7 @@ horus_stats_merge (struct horus_stats *res, struct horus_stats *delta)
   res->success += delta->success;
   res->giveup += delta->giveup;
   res->resmismatch += delta->resmismatch;
+  res->keycalculated += delta->keycalculated;
 }
 
 void
@@ -53,6 +54,7 @@ horus_stats_print (struct horus_stats *stats)
   printf (" success: %llu", stats->success);
   printf (" giveup: %llu", stats->giveup);
   printf (" resmismatch: %llu", stats->resmismatch);
+  printf (" keycalculated: %llu", stats->keycalculated);
   printf ("\n");
 }
 

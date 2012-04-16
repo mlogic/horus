@@ -42,6 +42,11 @@ void *duplicate_key (const void *key, size_t key_len);
 
 struct _key_store_entry* find_key_by_fd (const int fd);
 
+
+int
+horus_block_key (char *k, size_t *klen, int kx, int ky,
+                 char *kp, size_t kplen, int kpx, int kpy,
+                 unsigned int *kht_block_size);
 int
 horus_key_by_master (char *key, size_t *key_len, int x, int y,
                      char *master, int master_len,

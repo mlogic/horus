@@ -41,8 +41,8 @@ const char *optusage = "\
 -s, --server      Specify server IP address A.B.C.D[:P] (default: %s:%d)\n\
 -x, --key-x       Specify x to calculate key K_x,y\n\
 -y, --key-y       Specify y to calculate key K_x,y\n\
--o, --offset      Specify file offset to access (e.g., 1G)\n\
--l, --length      Specify size of the range to access (from offset) (e.g., 1G)\n\
+-o, --offset      Specify file offset to access (in bytes, e.g., 1G)\n\
+-l, --length      Specify size of the range to access (from offset, in bytes, e.g., 1G)\n\
 -a, --aggregate   Specify the level of aggregation of request range keys\n\
 -e, --simulation  Turn on simulation mode of leaf key calculation\n\
 -w, --spinwait    Turn on spinning busy-wait mode\n\
@@ -92,6 +92,8 @@ struct thread_info {
   u_int32_t alevel;
   u_int32_t aboffset;
   unsigned long anblock;
+  u_int32_t leaf_level;
+  u_int32_t *kht_block_size;
   char *filename;
   char *server;
   struct sockaddr_in *serv_addr;
@@ -255,7 +257,7 @@ thread_read_write (void *arg)
       krespkeylen = (int) ntohl (kresp.key_len);
       horus_stats_record (&info->stats, kresperr, krespsuberr);
 
-      if ((benchmark && horus_debug) || (! benchmark && horus_verbose))
+      if (horus_verbose && ! benchmark)
         {
           if (kresperr)
             printf ("thread[%d]: err = %d : %s\n", id,
@@ -267,6 +269,43 @@ thread_read_write (void *arg)
             printf ("thread[%d]: key_%d,%d: key_%d,%d/%d = %s\n", id,
                     reqx, reqy, resx, resy, krespkeylen,
                     print_key (kresp.key, krespkeylen));
+        }
+
+      if (simulate && ! kresperr)
+        {
+          char key[HORUS_MAX_KEY_LEN];
+          size_t key_len;
+          int simx, simy;
+          unsigned long sboffset, snblock;
+          u_int32_t *kht_block_size;
+          int j;
+
+          assert (reqx == resx && reqy == resy);
+          simx = info->leaf_level;
+          kht_block_size = info->kht_block_size;
+
+          sboffset = resy * (kht_block_size[resx] / kht_block_size[simx]);
+          snblock = kht_block_size[resx];
+
+          if (resx == info->leaf_level)
+            {
+              info->stats.keycalculated = info->stats.success;
+            }
+          else
+            {
+              for (j = 0; j < snblock; j++)
+                {
+                  simy = sboffset + j;
+                  key_len = sizeof (key);
+                  horus_block_key (key, &key_len, simx, simy,
+                                   kresp.key, krespkeylen, resx, resy,
+                                   kht_block_size);
+                  info->stats.keycalculated++;
+                  if (horus_verbose && ! benchmark)
+                    printf ("thread[%d]: simulated: K_%d,%d = %s\n", id,
+                            simx, simy, print_key (key, key_len));
+                }
+            }
         }
     }
 
@@ -282,10 +321,18 @@ thread_read_write (void *arg)
       info->timeval = res;
       printf ("thread[%d]: %llu/%lu keys in %f secs ( %f q/s\n",
               id, info->stats.success, nblock, time, info->stats.success/time);
+      if (simulate)
+        printf ("thread[%d]: %llu keys calculated in %f secs ( %f q/s\n",
+                id, info->stats.keycalculated, time, info->stats.success/time);
     }
   else if (horus_verbose)
-    printf ("thread[%d]: %llu/%lu keys processed.\n",
-            id, info->stats.success, nblock);
+    {
+      printf ("thread[%d]: %llu/%lu keys processed.\n",
+              id, info->stats.success, nblock);
+      if (simulate)
+        printf ("thread[%d]: %llu keys calculated\n",
+                id, info->stats.keycalculated);
+    }
 
   return NULL;
 }
@@ -597,12 +644,9 @@ main (int argc, char **argv)
       thread[i].server = server[i % nservers];
       thread[i].serv_addr = &serv_addr[i % nservers];
 
-      thread[i].level = level;
-      unit = nblock / nthread;
-      thread[i].boffset = boffset + unit * i;
-      thread[i].nblock = unit;
-      if (i + 1 == nthread)
-        thread[i].nblock += nblock % nthread;
+      thread[i].leaf_level = leaf_level;
+      //thread[i].kht_block_size = &c.kht_block_size[0];
+      thread[i].kht_block_size = c.kht_block_size;
 
       if (aggregate)
         {
@@ -612,6 +656,15 @@ main (int argc, char **argv)
           thread[i].nblock = unit;
           if (i + 1 == nthread)
             thread[i].nblock += anblock % nthread;
+        }
+      else
+        {
+          thread[i].level = level;
+          unit = nblock / nthread;
+          thread[i].boffset = boffset + unit * i;
+          thread[i].nblock = unit;
+          if (i + 1 == nthread)
+            thread[i].nblock += nblock % nthread;
         }
 
       pthread_create (&thread[i].pthread, NULL,
@@ -633,7 +686,7 @@ main (int argc, char **argv)
     {
       timeval_sub (&end, &start, &res);
       time = res.tv_sec + res.tv_usec * 0.000001;
-      printf ("horus benchmark1: %llu keys in %f secs by %f q/s\n",
+      printf ("benchmark: overall-requested: %llu keys in %f secs by %f q/s\n",
               stats.success, time, stats.success/time);
     }
 
@@ -648,7 +701,23 @@ main (int argc, char **argv)
           total += thread[i].stats.success;
           qps += thread[i].stats.success / time;
         }
-      printf ("horus benchmark2: %llu keys by %f q/s\n", total, qps);
+      printf ("benchmark: per-thread-requested: %llu keys by %f q/s\n",
+              total, qps);
+    }
+
+  if (benchmark && simulate)
+    {
+      double qps = 0.0;
+      unsigned long long total = 0;
+      for (i = 0; i < nthread; i++)
+        {
+          time = thread[i].timeval.tv_sec +
+                 thread[i].timeval.tv_usec * 0.000001;
+          total += thread[i].stats.keycalculated;
+          qps += thread[i].stats.keycalculated / time;
+        }
+      printf ("benchmark: per-thread-simulated: %llu leaf keys by %f q/s\n",
+              total, qps);
     }
 
   free (thread);
