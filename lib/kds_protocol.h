@@ -6,7 +6,7 @@
 #define HORUS_KDS_SERVER_ADDR   "127.0.0.1"
 #define HORUS_KDS_SERVER_PORT   6666
 
-#define HORUS_THREAD_MAX        64
+#define HORUS_THREAD_MAX        512
 #define HORUS_MAX_KHT_DEPTH     16
 #define HORUS_MAX_KEY_LEN       41
 #define HORUS_MAX_FILENAME_LEN  256
