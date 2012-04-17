@@ -653,19 +653,31 @@ main (int argc, char **argv)
         {
           thread[i].level = alevel;
           unit = anblock / nthread;
-          thread[i].boffset = aboffset + unit * i;
-          thread[i].nblock = unit;
-          if (i + 1 == nthread)
-            thread[i].nblock += anblock % nthread;
+          if (i < anblock % nthread)
+            {
+              thread[i].boffset = aboffset + unit * i + i;
+              thread[i].nblock = unit + 1;
+            }
+          else
+            {
+              thread[i].boffset = aboffset + unit * i + anblock % nthread;
+              thread[i].nblock = unit;
+            }
         }
       else
         {
           thread[i].level = level;
           unit = nblock / nthread;
-          thread[i].boffset = boffset + unit * i;
-          thread[i].nblock = unit;
-          if (i + 1 == nthread)
-            thread[i].nblock += nblock % nthread;
+          if (i < nblock % nthread)
+            {
+              thread[i].boffset = boffset + unit * i + i;
+              thread[i].nblock = unit + 1;
+            }
+          else
+            {
+              thread[i].boffset = boffset + unit * i + nblock % nthread;
+              thread[i].nblock = unit;
+            }
         }
 
       pthread_create (&thread[i].pthread, NULL,
