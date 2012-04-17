@@ -323,7 +323,8 @@ thread_read_write (void *arg)
               id, info->stats.success, nblock, time, info->stats.success/time);
       if (simulate)
         printf ("thread[%d]: %llu keys calculated in %f secs ( %f q/s\n",
-                id, info->stats.keycalculated, time, info->stats.success/time);
+                id, info->stats.keycalculated, time,
+                info->stats.keycalculated/time);
     }
   else if (horus_verbose)
     {
@@ -696,10 +697,13 @@ main (int argc, char **argv)
       unsigned long long total = 0;
       for (i = 0; i < nthread; i++)
         {
-          time = thread[i].timeval.tv_sec +
-                 thread[i].timeval.tv_usec * 0.000001;
-          total += thread[i].stats.success;
-          qps += thread[i].stats.success / time;
+          if (thread[i].stats.success)
+            {
+              time = thread[i].timeval.tv_sec +
+                     thread[i].timeval.tv_usec * 0.000001;
+              total += thread[i].stats.success;
+              qps += thread[i].stats.success / time;
+            }
         }
       printf ("benchmark: per-thread-requested: %llu keys by %f q/s\n",
               total, qps);
@@ -711,10 +715,13 @@ main (int argc, char **argv)
       unsigned long long total = 0;
       for (i = 0; i < nthread; i++)
         {
-          time = thread[i].timeval.tv_sec +
-                 thread[i].timeval.tv_usec * 0.000001;
-          total += thread[i].stats.keycalculated;
-          qps += thread[i].stats.keycalculated / time;
+          if (thread[i].stats.keycalculated)
+            {
+              time = thread[i].timeval.tv_sec +
+                     thread[i].timeval.tv_usec * 0.000001;
+              total += thread[i].stats.keycalculated;
+              qps += thread[i].stats.keycalculated / time;
+            }
         }
       printf ("benchmark: per-thread-simulated: %llu leaf keys by %f q/s\n",
               total, qps);
