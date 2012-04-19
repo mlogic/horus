@@ -585,7 +585,10 @@ main (int argc, char **argv)
   /* length */
   nblock = 1;
   if (length)
-    nblock = length / HORUS_BLOCK_SIZE;
+    {
+      level = leaf_level;
+      nblock = length / HORUS_BLOCK_SIZE;
+    }
 
   /* when key is specified (override the length) */
   if (keyspec && simulate)
@@ -611,14 +614,18 @@ main (int argc, char **argv)
       for (i = level; alevel < i; i--)
         {
           branch = c.kht_block_size[i - 1] / c.kht_block_size[i];
-          aboffset /= branch;
+          if (anblock / branch == 0)
+            break;
           anblock /= branch;
+          aboffset /= branch;
         }
+      alevel = i;
     }
 
   if (horus_verbose)
     {
       printf ("nthread: %d\n", nthread);
+      printf ("filename: %s\n", filename);
       if (benchmark)
         printf ("benchmark: ");
       if (dumb_ass_mode)
