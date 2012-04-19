@@ -12,7 +12,7 @@ BEGIN {
 }
 
 /^benchmark: per-thread-simulated: / {
-  qps = $6;
+  qps = $7;
   printf "kht-branch-depth: %d performance: %f qps\n", depth, qps;
 }
 
