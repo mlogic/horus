@@ -622,7 +622,7 @@ main (int argc, char **argv)
       alevel = i;
     }
 
-  if (horus_verbose)
+  if (horus_verbose || benchmark)
     {
       printf ("nthread: %d\n", nthread);
       printf ("filename: %s\n", filename);
