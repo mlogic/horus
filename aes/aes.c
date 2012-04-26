@@ -1279,7 +1279,7 @@ int aes_expand_key(struct aes_cipher *ctx, const u8 *in_key,
  * &crypto_aes_ctx _must_ be the private data embedded in @tfm which is
  * retrieved with crypto_tfm_ctx().
  */
-int aes_set_key(struct aes_cipher *ctx, const u8 *in_key,
+int aes_set_key(const struct aes_cipher *ctx, const u8 *in_key,
 		unsigned int key_len)
 {
   int ret;
