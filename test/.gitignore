@@ -3,18 +3,3 @@ check_api
 check_horus_key
 benchmark_key_utils
 
-FILENAME
-horus-benchmark-key.log
-horus-benchmark-key.data
-horus-benchmark-key.png
-horus-benchmark-key.eps
-horus-benchmark-key.pdf
-horus-benchmark-key-branch.log
-horus-benchmark-key-branch.data
-horus-benchmark-key-branch.png
-horus-benchmark-key-branch.eps
-horus-benchmark-key-branch.pdf
-
-horus-benchmark-kds-*.data
-horus-benchmark-kds.eps
-horus-benchmark-kds.png

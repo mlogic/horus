@@ -1,5 +1,5 @@
 
-SUBDIRS = lib src test
+SUBDIRS = lib src aes test
 
 # AM_CPPFLAGS = -I$(top_srcdir)/lib @PTHREAD_CFLAGS@
 

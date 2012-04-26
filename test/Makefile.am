@@ -6,7 +6,7 @@ check_PROGRAMS = check_aes check_horus_key check_api benchmark_key_utils \
     benchmark_read_write
 check_aes_SOURCES = check_aes.c \
     $(top_srcdir)/aes/gf128mul.c $(top_srcdir)/aes/xts.c
-if INTEL_AESNI
+if AESNI
 check_aes_SOURCES += \
     $(top_srcdir)/aes/aesni-intel_glue.c \
     $(top_srcdir)/aes/aesni-intel_asm.S

@@ -13,26 +13,6 @@ AC_PREFIX_DEFAULT($HOME)
 # see https://fedoraproject.org/wiki/UnderstandingDSOLinkChange
 PTHREAD_LIBS="-lpthread"
 
-AC_ARG_ENABLE([horus],
-  [AS_HELP_STRING([--enable-horus],
-                  [enable horus functions [default=yes]])])
-AC_ARG_ENABLE([log-syslog],
-  [AS_HELP_STRING([--enable-log-syslog],
-                  [enable logging to syslog [default=yes]])])
-AC_ARG_ENABLE([log-stderr],
-  [AS_HELP_STRING([--enable-log-stderr],
-                  [enable logging to stderr])])
-
-if test "$enable_horus" != "no"; then
-  AC_DEFINE(ENABLE_HORUS,,Enable Horus)
-fi
-if test "$enable_log_syslog" != "no"; then
-  AC_DEFINE(ENABLE_SYSLOG,,Logging to syslog)
-fi
-if test "$enable_log_stderr" = "yes"; then
-  AC_DEFINE(ENABLE_STDERR,,Logging to stderr)
-fi
-
 AC_ARG_ENABLE([debug],
      [  --enable-debug    Turn on debugging],
      [case "${enableval}" in
@@ -40,7 +20,6 @@ AC_ARG_ENABLE([debug],
        no)  debug=false ;;
         *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
      esac],[debug=false])
-#CFLAGS="$CFLAGS -std=gnu99 -Wall -D_FILE_OFFSET_BITS=64"
 CFLAGS="$CFLAGS -Wall"
 if test x$debug = xtrue; then
    CFLAGS="$CFLAGS -g -O0"
@@ -61,14 +40,14 @@ case $host in
 esac
 AM_CONDITIONAL([APPLE], [test x$apple = xtrue])
 
-AC_ARG_ENABLE([aseni],
-     [  --enable-intel-aesni    Turn on Intel AESNI],
+AC_ARG_ENABLE([aesni],
+     [  --enable-aesni    Turn on Intel AESNI],
      [case "${enableval}" in
        yes) intel_aesni=true ;;
        no)  intel_aesni=false ;;
         *) AC_MSG_ERROR([bad value ${enableval} for --enable-intel-aesni]) ;;
-     esac],[intel_aesni=false])
-AM_CONDITIONAL([INTEL_AESNI], [test x$intel_aesni = xtrue])
+     esac],[aesni=false])
+AM_CONDITIONAL([AESNI], [test x$aesni = xtrue])
 
 AC_ARG_ENABLE([fuse],
      [  --enable-fuse    Build FUSE support],
@@ -105,5 +84,5 @@ AX_PTHREAD([AC_DEFINE([HAVE_PTHREAD],1,[POSIX thread support.])],AC_MSG_ERROR([M
 LT_INIT
 AC_SUBST([LIBTOOL_DEPS])
 
-AC_CONFIG_FILES([Makefile lib/Makefile src/Makefile test/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile src/Makefile aes/Makefile test/Makefile])
 AC_OUTPUT

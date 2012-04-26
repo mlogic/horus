@@ -11,8 +11,9 @@
  * published by the Free Software Foundation.
  */
 
-#include "horus_key.h"
 #include "horus.h"
+
+#include "horus_key.h"
 #include "log.h"
 
 int debug = 0;
@@ -100,44 +101,6 @@ horus_open (int fd, const char *path, int oflag, mode_t mode)
   return 0;
 }
 
-extern struct _key_store_entry *key_store, *key_store_tail;
-
-
-/** Scans key_store to find the entry for fd, create a new entry if not found
- */
-struct
-_key_store_entry *find_key_by_fd_or_create_new (const int fd)
-{
-  struct _key_store_entry *p = find_key_by_fd (fd);
-
-  if (NULL != p)
-    return p;
-  else
-    {
-      // not found, allocate a new entry
-      p = malloc (sizeof (struct _key_store_entry));
-      if (NULL == p)
-	abort ();
-      memset (p, 0, sizeof (struct _key_store_entry));
-      p->fd = fd;
-      p->cipher = aes_xts_init();
-      // first entry of key_store?
-      if (NULL == key_store)
-	{
-	  key_store = p;
-	  key_store_tail = p;
-	}
-      else
-	{
-	  // append new_entry to tail
-	  key_store_tail->next = p;
-	  key_store_tail = p;
-	}
-    }
-
-  return p;
-}
-
 ssize_t
 horus_pread (int fd, void *buf, size_t size, off_t fdpos)
 {
@@ -153,6 +116,8 @@ horus_pwrite (int fd, void *buf, size_t size, off_t fdpos)
   abort ();
   return 0;
 }
+
+#if 0
 
 ssize_t
 horus_read (int fd, void *buf, size_t nbyte)
@@ -324,85 +289,5 @@ horus_set_kht (const int fd, int depth, size_t leaf_block_size, const int *branc
     p->block_size[i] = p->block_size[i+1] * p->branching_factor[i];
 }
 
-void *
-duplicate_key (const void *key, size_t key_len)
-{
-  void *key_to_add = malloc (HORUS_KEY_LEN);
-  if (NULL == key_to_add)
-    abort ();
-  memset (key_to_add, 0, HORUS_KEY_LEN);
-  memcpy (key_to_add, key, key_len > HORUS_KEY_LEN ? HORUS_KEY_LEN : key_len);
-  return key_to_add;
-}
+#endif /*0*/
 
-int
-horus_add_key (const int fd,
-	       const void *key, size_t key_len,
-	       const int x, const int y)
-{
-  void *key_to_add;
-  void *old_key;
-  struct vectorx *key_vec_x;
-  struct _key_store_entry *p = find_key_by_fd (fd);
-
-  if (NULL == p)
-    {
-      perror (__func__);
-      abort ();
-    }
-  if (0 == x && 0 == y)  /* master key? */
-    {
-      p->master_key = duplicate_key (key, key_len);
-      return 0;
-    }
-  if (x > p->depth)
-    {
-      perror ("Trying to set key at a level deeper than the depth of KHT.");
-      abort ();
-    }
-
-  key_vec_x = p->key_vec[x-1];
-  if (y < key_vec_x->limit)
-    {
-      if ((old_key = vectorx_get (key_vec_x, y)) != NULL)
-	free (old_key);
-    }
-
-  key_to_add = duplicate_key (key, key_len);
-  vectorx_set (key_vec_x, y, key_to_add);
-
-  return 0;
-}
-
-int
-horus_get_leaf_block_key (const int fd, void *out_key, size_t block_id)
-{
-  struct _key_store_entry *p = find_key_by_fd (fd);
-
-  if (NULL == p)
-    {
-      perror (__func__);
-      abort ();
-    }
-  
-  return horus_get_key (fd, out_key, p->depth, block_id);
-}
-
-ssize_t
-horus_get_block_size (const int fd, const int x)
-{
-  struct _key_store_entry *p = find_key_by_fd (fd);
-
-  if (NULL == p)
-    {
-      perror (__func__);
-      return -1;
-    }
-  if (x > p->depth)
-    {
-      fprintf (stderr, "Requesting block size at a level greater than depth\n");
-      return -1;
-    }
-
-  return p->block_size[x-1];
-}
