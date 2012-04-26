@@ -8,7 +8,7 @@ workdir=/tmp/horus
 
 . $srcdir/etc/server-conf.sh
 
-eval_command="$bindir/kds_client -o 0 -l 4G -e -v -b -w -t 1 -n 96"
+eval_command="$bindir/kds_client -o 0 -l 4G -e -v -b -w -t 1 -n 64"
 
 $eval_command -s $server1 -s $server2 $workdir/FILEB2D2  |& tee    ${testname}-branch2.log
 $eval_command -s $server1 -s $server2 $workdir/FILEB2D3  |& tee -a ${testname}-branch2.log
@@ -61,5 +61,17 @@ $eval_command -s $server1 -s $server2 $workdir/FILEB8D10 |& tee -a ${testname}-b
 $eval_command -s $server1 -s $server2 $workdir/FILEB8D11 |& tee -a ${testname}-branch8.log
 awk -f $srcdir/etc/${testname}.awk ${testname}-branch8.log > ${testname}-branch8.data
 
+
+$eval_command -s $server1 $workdir/FILEB8D2  |& tee    ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D3  |& tee -a ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D4  |& tee -a ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D5  |& tee -a ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D6  |& tee -a ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D7  |& tee -a ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D8  |& tee -a ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D9  |& tee -a ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D10 |& tee -a ${testname}-s1b8.log
+$eval_command -s $server1 $workdir/FILEB8D11 |& tee -a ${testname}-s1b8.log
+awk -f $srcdir/etc/${testname}.awk ${testname}-s1b8.log > ${testname}-s1b8.data
 
 

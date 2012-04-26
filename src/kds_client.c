@@ -616,7 +616,7 @@ main (int argc, char **argv)
           branch = c.kht_block_size[i - 1] / c.kht_block_size[i];
           if (anblock / branch == 0)
             break;
-          anblock /= branch;
+          anblock = (anblock / branch) + (anblock % branch ? 1 : 0);
           aboffset /= branch;
         }
       alevel = i;

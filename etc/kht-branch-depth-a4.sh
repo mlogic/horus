@@ -8,7 +8,7 @@ workdir=/tmp/horus
 
 . $srcdir/etc/server-conf.sh
 
-eval_command="$bindir/kds_client -o 0 -l 4G -e -v -b -w -t 1 -n 96 -a 4"
+eval_command="$bindir/kds_client -o 0 -l 4G -e -v -b -w -t 1 -n 64 -a 4"
 
 $eval_command -s $server1 -s $server2 $workdir/FILEB2D2  |& tee    ${testname}-branch2.log
 $eval_command -s $server1 -s $server2 $workdir/FILEB2D3  |& tee -a ${testname}-branch2.log
