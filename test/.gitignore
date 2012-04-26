@@ -2,6 +2,7 @@ check_aes
 check_api
 check_horus_key
 benchmark_key_utils
+benchmark_read_write
 
 FILENAME
 horus-benchmark-key.log
@@ -18,3 +19,4 @@ horus-benchmark-key-branch.pdf
 horus-benchmark-kds-*.data
 horus-benchmark-kds.eps
 horus-benchmark-kds.png
+
