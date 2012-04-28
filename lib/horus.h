@@ -23,6 +23,7 @@
 #include <netinet/in.h>
 
 #include <arpa/inet.h>
+#include <assert.h>
 
 #ifdef HAVE_OPENSSL
 #include <openssl/sha.h>

@@ -346,7 +346,7 @@ main (int argc, char **argv)
   int keyspec, keyx, keyy;
   unsigned long long offset, length;
   unsigned long level, boffset, nblock;
-  unsigned long  alevel, aboffset, anblock;
+  unsigned long alevel, aboffset, anblock;
   int branch;
   char *filename = NULL;
   char *endptr;
