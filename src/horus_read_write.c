@@ -88,6 +88,57 @@ print_block (char *block_data)
     }
 }
 
+void
+horus_key_request (char *key, int *key_len, char *filename, int x, int y,
+                   struct sockaddr_in *serv)
+{
+  int ret;
+  struct key_request_packet req;
+  struct key_response_packet res;
+  struct sockaddr_in addr;
+  socklen_t addrlen = sizeof (struct sockaddr_in);
+  int resx, resy, reskeylen;
+  int fd;
+  int reserr, ressuberr;
+
+  fd = socket (PF_INET, SOCK_DGRAM, 0);
+  assert (fd >= 0);
+
+  memset (&req, 0, sizeof (req));
+  req.x = htonl (x);
+  req.y = htonl (y);
+  snprintf (req.filename, sizeof (req.filename), "%s", filename);
+
+  ret = sendto (fd, &req, sizeof (struct key_request_packet), 0,
+                (struct sockaddr *) serv, sizeof (struct sockaddr_in));
+  assert (ret == sizeof (struct key_request_packet));
+  ret = recvfrom (fd, &res, sizeof (struct key_response_packet),  0,
+                  (struct sockaddr *) &addr, &addrlen);
+  assert (ret == sizeof (struct key_response_packet));
+
+  resx = ntohl (res.x);
+  resy = ntohl (res.y);
+  if (x != resx || y != resy)
+    {
+      printf ("wrong key.\n");
+      exit (1);
+    }
+
+  reserr = (int) ntohs (res.err);
+  ressuberr = (int) ntohs (res.suberr);
+  if (reserr || ressuberr)
+    {
+      printf ("err = %d: %s\n", reserr, horus_strerror (reserr));
+      printf ("suberr = %d: %s\n", ressuberr, strerror (ressuberr));
+      exit (1);
+    }
+
+  reskeylen = ntohl (res.key_len);
+  memset (key, 0, *key_len);
+  memcpy (key, res.key, reskeylen);
+  *key_len = reskeylen;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -121,6 +172,7 @@ main (int argc, char **argv)
   u_int8_t key[HORUS_KEY_LEN];
   u_int8_t iv[HORUS_KEY_LEN];
   struct aes_xts_cipher *cipher;
+  int key_len = HORUS_KEY_LEN;
 
   memset (&serv_addr, 0, sizeof (serv_addr));
   horus = encrypt = decrypt = aggregate = 0;
@@ -270,13 +322,6 @@ main (int argc, char **argv)
       nservers++;
     }
 
-  if (encrypt || decrypt)
-    {
-      snprintf ((char *)key, sizeof (key), "temporary");
-      cipher = aes_xts_init ();
-      aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
-    }
-
   oflag = O_RDONLY;
   if (readflag && writeflag)
     oflag = O_RDWR;
@@ -352,6 +397,13 @@ main (int argc, char **argv)
                 alevel, aboffset, anblock);
     }
 
+  if (encrypt || decrypt)
+    {
+      snprintf ((char *)key, sizeof (key), "temporary");
+      cipher = aes_xts_init ();
+      aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
+    }
+
   rlevel = level;
   rboffset = boffset;
   rnblock = nblock;
@@ -371,7 +423,14 @@ main (int argc, char **argv)
         {
           /* key request */
           printf ("request: K_%lu,%lu\n", rlevel, i);
-          printf ("receive: K_%lu,%lu\n", rlevel, i);
+          horus_key_request ((char *)key, &key_len, filename,
+                             rlevel, i, &serv_addr[0]);
+
+          printf ("K_%lu,%lu = %s\n", rlevel, i,
+                  print_key ((char *)key, HORUS_KEY_LEN));
+
+          if (encrypt || decrypt)
+            aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
         }
 
       /* calculate the leaf-level start and end block */
@@ -405,7 +464,8 @@ main (int argc, char **argv)
               if (decrypt)
                 {
                   if (horus_verbose)
-                    printf ("      decrypt.\n");
+                    printf ("      decrypt by key: %s.\n",
+                            print_key ((char *)key, HORUS_KEY_LEN));
 
                   /* Use block id as IV */
                   *(unsigned long *)iv = j;
@@ -429,7 +489,8 @@ main (int argc, char **argv)
               if (encrypt)
                 {
                   if (horus_verbose)
-                    printf ("      encrypt.\n");
+                    printf ("      encrypt by key: %s.\n",
+                            print_key ((char *)key, HORUS_KEY_LEN));
 
                   /* Use block id as IV */
                   *(unsigned long *)iv = j;
