@@ -89,8 +89,8 @@ print_block (char *block_data)
 }
 
 void
-horus_key_request (char *key, int *key_len, char *filename, int x, int y,
-                   struct sockaddr_in *serv)
+horus_key_request (char *key, size_t *key_len, char *filename, int x, int y,
+                   int sockfd, struct sockaddr_in *serv)
 {
   int ret;
   struct key_request_packet req;
@@ -98,21 +98,17 @@ horus_key_request (char *key, int *key_len, char *filename, int x, int y,
   struct sockaddr_in addr;
   socklen_t addrlen = sizeof (struct sockaddr_in);
   int resx, resy, reskeylen;
-  int fd;
   int reserr, ressuberr;
-
-  fd = socket (PF_INET, SOCK_DGRAM, 0);
-  assert (fd >= 0);
 
   memset (&req, 0, sizeof (req));
   req.x = htonl (x);
   req.y = htonl (y);
   snprintf (req.filename, sizeof (req.filename), "%s", filename);
 
-  ret = sendto (fd, &req, sizeof (struct key_request_packet), 0,
+  ret = sendto (sockfd, &req, sizeof (struct key_request_packet), 0,
                 (struct sockaddr *) serv, sizeof (struct sockaddr_in));
   assert (ret == sizeof (struct key_request_packet));
-  ret = recvfrom (fd, &res, sizeof (struct key_response_packet),  0,
+  ret = recvfrom (sockfd, &res, sizeof (struct key_response_packet),  0,
                   (struct sockaddr *) &addr, &addrlen);
   assert (ret == sizeof (struct key_response_packet));
 
@@ -136,15 +132,15 @@ horus_key_request (char *key, int *key_len, char *filename, int x, int y,
   reskeylen = ntohl (res.key_len);
   memset (key, 0, *key_len);
   memcpy (key, res.key, reskeylen);
-  *key_len = reskeylen;
+  *key_len = (size_t) reskeylen;
 }
 
 int
 main (int argc, char **argv)
 {
-  int fd, ret, ch;
+  int fd, sockfd, ret, ch;
   unsigned long i, j;
-  unsigned long start, end;
+  unsigned long startb, endb;
   int ncount = 0;
   unsigned long long offset, length, size;
   char *filename = NULL;
@@ -170,9 +166,15 @@ main (int argc, char **argv)
   char block_storage[HORUS_BLOCK_SIZE];
 
   u_int8_t key[HORUS_KEY_LEN];
+  size_t key_len = HORUS_KEY_LEN;
+  u_int8_t rkey[HORUS_KEY_LEN];
+  size_t rkey_len = HORUS_KEY_LEN;
   u_int8_t iv[HORUS_KEY_LEN];
   struct aes_xts_cipher *cipher;
-  int key_len = HORUS_KEY_LEN;
+
+  unsigned long total, total_read, total_write;
+  unsigned long total_encrypt, total_decrypt;
+  struct timeval start, end, res;
 
   memset (&serv_addr, 0, sizeof (serv_addr));
   horus = encrypt = decrypt = aggregate = 0;
@@ -181,7 +183,11 @@ main (int argc, char **argv)
   for (i = 0; i < HORUS_BLOCK_SIZE; i++)
     block_data[i] = (char) i;
   memset (key, 0, sizeof (key));
+  memset (rkey, 0, sizeof (key));
   memset (iv, 0, sizeof (iv));
+
+  total = total_read = total_write = 0;
+  total_encrypt = total_decrypt = 0;
 
   progname = (1 ? "kds_client" : argv[0]);
   while ((ch = getopt_long (argc, argv, optstring, longopts, NULL)) != -1)
@@ -389,19 +395,37 @@ main (int argc, char **argv)
     {
       printf ("filename: %s\n", filename);
       if (benchmark)
-        printf ("benchmark: ");
+        printf ("benchmark.\n");
       printf ("level: %lu boffset: %lu nblock: %lu\n",
               level, boffset, nblock);
       if (aggregate)
         printf ("alevel: %lu aboffset: %lu anblock: %lu\n",
                 alevel, aboffset, anblock);
+      printf ("flags: ");
+      if (encrypt)
+        printf (" encrypt");
+      if (decrypt)
+        printf (" decrypt");
+      if (readflag)
+        printf (" readflag");
+      if (writeflag)
+        printf (" writeflag");
+      if (horus)
+        printf (" horus");
+      printf ("\n");
+    }
+
+  if (horus)
+    {
+      sockfd = socket (PF_INET, SOCK_DGRAM, 0);
+      assert (sockfd >= 0);
     }
 
   if (encrypt || decrypt)
     {
-      snprintf ((char *)key, sizeof (key), "temporary");
+      memset (key, 0, sizeof (key));
+      snprintf ((char *)key, sizeof (key), "initial key");
       cipher = aes_xts_init ();
-      aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
     }
 
   rlevel = level;
@@ -414,6 +438,9 @@ main (int argc, char **argv)
       rnblock = anblock;
     }
 
+  if (benchmark)
+    gettimeofday (&start, NULL);
+
   for (i = 0; i < rnblock; i++)
     {
       if (horus_verbose)
@@ -422,36 +449,49 @@ main (int argc, char **argv)
       if (horus)
         {
           /* key request */
-          printf ("request: K_%lu,%lu\n", rlevel, i);
-          horus_key_request ((char *)key, &key_len, filename,
-                             rlevel, i, &serv_addr[0]);
-
-          printf ("K_%lu,%lu = %s\n", rlevel, i,
-                  print_key ((char *)key, HORUS_KEY_LEN));
-
-          if (encrypt || decrypt)
-            aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
+          if (horus_verbose)
+            printf ("request: K_%lu,%lu\n", rlevel, i);
+          rkey_len = sizeof (rkey);
+          horus_key_request ((char *)rkey, &rkey_len, filename,
+                             rlevel, i, sockfd, &serv_addr[0]);
+          /* set key */
+          if (horus_verbose)
+            printf ("got K_%lu,%lu = %s\n", rlevel, i,
+                    print_key ((char *)rkey, HORUS_KEY_LEN));
         }
 
       /* calculate the leaf-level start and end block */
-      start = c.kht_block_size[rlevel] * i;
-      end = c.kht_block_size[rlevel] * (i + 1);
-      if (length && length < end * HORUS_BLOCK_SIZE)
-        end = (length / HORUS_BLOCK_SIZE) +
-              (length % HORUS_BLOCK_SIZE ? 1 : 0);
+      startb = c.kht_block_size[rlevel] * i;
+      endb = c.kht_block_size[rlevel] * (i + 1);
+      if (length && length < endb * HORUS_BLOCK_SIZE)
+        endb = (length / HORUS_BLOCK_SIZE) +
+               (length % HORUS_BLOCK_SIZE ? 1 : 0);
       if (horus_verbose)
-        printf ("  start: %lu end: %lu\n", start, end);
+        printf ("  start: %lu end: %lu\n", startb, endb);
 
-      for (j = start; j < end; j++)
+      for (j = startb; j < endb; j++)
         {
           if (horus_verbose)
             printf ("    for level: %lu block: %lu\n", leaf_level, j);
 
           if (horus && rlevel != leaf_level)
             {
+              /* key request */
+              key_len = sizeof (key);
+              horus_block_key ((char *)key, &key_len, leaf_level, j,
+                               (char *)rkey, rkey_len, rlevel, i,
+                               c.kht_block_size);
               if (horus_verbose)
-                printf ("    calculate leaf key\n");
-              //horus_block_key ();
+                printf ("    calculate leaf key: K_%lu,%lu = %s\n",
+                        leaf_level, j, print_key ((char *)key, HORUS_KEY_LEN));
+            }
+
+          if (encrypt || decrypt)
+            {
+              aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
+              if (horus_verbose)
+                printf ("    crypt key: = %s\n",
+                        print_key ((char *)key, HORUS_KEY_LEN));
             }
 
           if (readflag)
@@ -472,11 +512,15 @@ main (int argc, char **argv)
                   aes_xts_decrypt (cipher, block_data, block_storage,
                                    HORUS_BLOCK_SIZE, iv);
                   block = block_data;
+
+                  total_decrypt++;
                 }
               else
                 {
                   memcpy (block_data, block_storage, HORUS_BLOCK_SIZE);
                 }
+
+              total_read++;
 
               if (horus_debug)
                 print_block (block);
@@ -497,16 +541,45 @@ main (int argc, char **argv)
                   aes_xts_encrypt (cipher, block_storage, block_data,
                                    HORUS_BLOCK_SIZE, iv);
                   block = block_storage;
+
+                  total_encrypt++;
                 }
 
               if (horus_verbose)
                 printf ("      write();\n");
               write (fd, block, HORUS_BLOCK_SIZE);
+
+              total_write++;
             }
+
+          total++;
         }
     }
 
+  if (benchmark)
+    gettimeofday (&end, NULL);
+
+  close (sockfd);
   close (fd);
+
+  if (benchmark)
+    {
+      unsigned long long bytes;
+      double time, Bps, IOps;
+
+      timeval_sub (&end, &start, &res);
+      time = res.tv_sec + res.tv_usec * 0.000001;
+      bytes = total * HORUS_BLOCK_SIZE;
+      Bps = bytes / time;
+      IOps = total / time;
+
+      printf ("read/write: read: %lu decrypt: %lu encrypt: %lu write: %lu\n",
+              total_read, total_decrypt, total_encrypt, total_write);
+      printf ("horus: reqlevel: %lu #reqkeys %lu\n", rlevel, rnblock);
+      printf ("time: length %llu nblock: %lu time %f secs\n",
+              length, total, time);
+      printf ("I/Ops: %f I/Ops Bps: %f Bps\n", IOps, Bps);
+    }
 
   return 0;
 }
