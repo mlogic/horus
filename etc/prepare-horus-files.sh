@@ -1,7 +1,7 @@
 #!/bin/sh
 
-bindir=/home/yasu/bin
-srcdir=/home/yasu/horus
+bindir=~/bin
+srcdir=~/horus
 workdir=/tmp/horus
 
 . $srcdir/etc/server-conf.sh
