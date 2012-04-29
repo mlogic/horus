@@ -18,5 +18,5 @@ kds_client_SOURCES = kds_client.c
 kds_client_LDADD = ../lib/libhorus.la @PTHREAD_LIBS@
 
 horus_read_write_SOURCES = horus_read_write.c
-horus_read_write_LDADD = ../lib/libhorus.la @PTHREAD_LIBS@
+horus_read_write_LDADD = ../lib/libhorus.la ../aes/libaes.la
 

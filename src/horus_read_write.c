@@ -8,6 +8,8 @@
 #include <benchmark.h>
 #include "timeval.h"
 
+#include <xts.h>
+
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
 char *progname;
 
@@ -23,13 +25,14 @@ extern int horus_verbose;
 int benchmark = 0;
 int aggregate = 0;
 
-const char *optstring = "hvdbeus:rwf:l:a:n:";
+const char *optstring = "hvdbegus:a:rwf:l:t:n:";
 const char *optusage = "\
 -h, --help        Display this help and exit\n\
 -v, --verbose     Turn on verbose mode\n\
 -d, --debug       Turn on debugging mode\n\
 -b, --benchmark   Turn on benchmarking\n\
--e, --encrypt     Turn on encrypting/decrypting\n\
+-e, --encrypt     Turn on encrypting\n\
+-g, --decrypt     Turn on decrypting\n\
 -u, --horus       Turn on Horus mode\n\
 -s, --server      Specify server IP address A.B.C.D[:P] (default: %s:%d)\n\
 -a, --aggregate   Specify the level of aggregation of request range keys\n\
@@ -47,6 +50,7 @@ const struct option longopts[] = {
   { "debug",      no_argument,        NULL, 'd' },
   { "benchmark",  no_argument,        NULL, 'b' },
   { "encrypt",    no_argument,        NULL, 'e' },
+  { "decrypt",    no_argument,        NULL, 'g' },
   { "horus",      no_argument,        NULL, 'u' },
   { "server",     required_argument,  NULL, 's' },
   { "aggregate",  required_argument,  NULL, 'a' },
@@ -70,6 +74,20 @@ usage ()
   exit (0);
 }
 
+void
+print_block (char *block_data)
+{
+  unsigned long i;
+  for (i = 0; i < HORUS_BLOCK_SIZE; i++)
+    {
+      if (i % 32 == 0)
+        printf ("data: %4lu: ", i);
+      printf ("%02x", (char) block_data[i] & 0xff);
+      if (i % 32 == 31)
+        printf ("\n");
+    }
+}
+
 int
 main (int argc, char **argv)
 {
@@ -80,7 +98,7 @@ main (int argc, char **argv)
   unsigned long long offset, length, size;
   char *filename = NULL;
   char *endptr;
-  int encrypt, horus, readflag, writeflag;
+  int encrypt, decrypt, horus, readflag, writeflag;
   unsigned long leaf_level = HORUS_DEFAULT_LEAF_LEVEL;
   unsigned long level, boffset, nblock;
   unsigned long alevel, aboffset, anblock;
@@ -96,9 +114,22 @@ main (int argc, char **argv)
   int oflag;
   struct horus_file_config c;
 
+  char *block;
+  char block_data[HORUS_BLOCK_SIZE];
+  char block_storage[HORUS_BLOCK_SIZE];
+
+  u_int8_t key[HORUS_KEY_LEN];
+  u_int8_t iv[HORUS_KEY_LEN];
+  struct aes_xts_cipher *cipher;
+
   memset (&serv_addr, 0, sizeof (serv_addr));
-  horus = encrypt = aggregate = 0;
+  horus = encrypt = decrypt = aggregate = 0;
   readflag = writeflag = 0;
+
+  for (i = 0; i < HORUS_BLOCK_SIZE; i++)
+    block_data[i] = (char) i;
+  memset (key, 0, sizeof (key));
+  memset (iv, 0, sizeof (iv));
 
   progname = (1 ? "kds_client" : argv[0]);
   while ((ch = getopt_long (argc, argv, optstring, longopts, NULL)) != -1)
@@ -116,6 +147,9 @@ main (int argc, char **argv)
           break;
         case 'e':
           encrypt++;
+          break;
+        case 'g':
+          decrypt++;
           break;
         case 'u':
           horus++;
@@ -223,7 +257,7 @@ main (int argc, char **argv)
       exit (1);
     }
 
-  if (nservers == 0)
+  if (horus && nservers == 0)
     {
       /* default setting */
       server[nservers] = HORUS_KDS_SERVER_ADDR;
@@ -234,6 +268,13 @@ main (int argc, char **argv)
       port = HORUS_KDS_SERVER_PORT;
       serv_addr[nservers].sin_port = htons (port);
       nservers++;
+    }
+
+  if (encrypt || decrypt)
+    {
+      snprintf ((char *)key, sizeof (key), "temporary");
+      cipher = aes_xts_init ();
+      aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
     }
 
   oflag = O_RDONLY;
@@ -356,34 +397,50 @@ main (int argc, char **argv)
 
           if (readflag)
             {
-              if (encrypt)
+              if (horus_verbose)
+                printf ("      read();\n");
+              read (fd, block_storage, HORUS_BLOCK_SIZE);
+              block = block_storage;
+
+              if (decrypt)
                 {
                   if (horus_verbose)
-                    printf ("      read_decrypt(key);\n");
-                  //horus_read ();
+                    printf ("      decrypt.\n");
+
+                  /* Use block id as IV */
+                  *(unsigned long *)iv = j;
+                  aes_xts_decrypt (cipher, block_data, block_storage,
+                                   HORUS_BLOCK_SIZE, iv);
+                  block = block_data;
                 }
               else
                 {
-                  if (horus_verbose)
-                    printf ("      read();\n");
-                  //read ();
+                  memcpy (block_data, block_storage, HORUS_BLOCK_SIZE);
                 }
+
+              if (horus_debug)
+                print_block (block);
             }
 
           if (writeflag)
             {
+              block = block_data;
+
               if (encrypt)
                 {
                   if (horus_verbose)
-                    printf ("      write_encrypt(key);\n");
-                  //horus_write ();
+                    printf ("      encrypt.\n");
+
+                  /* Use block id as IV */
+                  *(unsigned long *)iv = j;
+                  aes_xts_encrypt (cipher, block_storage, block_data,
+                                   HORUS_BLOCK_SIZE, iv);
+                  block = block_storage;
                 }
-              else
-                {
-                  if (horus_verbose)
-                    printf ("      write();\n");
-                  //write ();
-                }
+
+              if (horus_verbose)
+                printf ("      write();\n");
+              write (fd, block, HORUS_BLOCK_SIZE);
             }
         }
     }
