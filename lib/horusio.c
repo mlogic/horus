@@ -125,7 +125,7 @@ horusio_write (int fd, const void *buf, size_t size)
     inet_pton(AF_INET, HORUS_KDS_SERVER_ADDR, &serv_addr.sin_addr);
     serv_addr.sin_port = htons (6666);
     printf ("request: K_%lu,%lu\n", leaf_level, block_num);
-    horus_key_request ((char *)key, &key_len, real_path,
+    client_key_request ((char *)key, &key_len, real_path,
                        leaf_level, block_num, &serv_addr);
 
     printf ("K_%lu,%lu = %s\n", leaf_level, block_num,
