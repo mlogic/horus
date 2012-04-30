@@ -56,6 +56,7 @@
 extern int debug;
 extern int horus_debug;
 extern int horus_verbose;
+extern int server_fd;
 
 unsigned long long
 canonical_byte_size (char *notation, char **endptr);
