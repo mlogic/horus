@@ -48,5 +48,8 @@ typedef struct key_response_packet key_response_packet;
 char *
 horus_strerror (u_int16_t err);
 
+void
+horus_key_request (char *key, int *key_len, char *filename, int x, int y,
+                   struct sockaddr_in *serv);
 #endif /*_KDS_PROTOCOL_H_*/
 
