@@ -98,7 +98,7 @@ $cmd $workdir/FILEB8D11 -l 2560M -e -u 2>&1 | tee -a ${testname}-euwrite-a3.log
 $cmd $workdir/FILEB8D11 -l 3072M -e -u 2>&1 | tee -a ${testname}-euwrite-a3.log
 $cmd $workdir/FILEB8D11 -l 3584M -e -u 2>&1 | tee -a ${testname}-euwrite-a3.log
 $cmd $workdir/FILEB8D11 -l 4096M -e -u 2>&1 | tee -a ${testname}-euwrite-a3.log
-awk -f $srcdir/etc/${testname}.awk ${testame}-euwrite-a3.log > ${testname}-euwrite-a3.data
+awk -f $srcdir/etc/${testname}.awk ${testname}-euwrite-a3.log > ${testname}-euwrite-a3.data
 
 
 
