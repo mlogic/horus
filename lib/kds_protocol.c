@@ -34,23 +34,23 @@ client_key_request (char *key, int *key_len, char *filename, int x, int y,
   struct sockaddr_in addr;
   socklen_t addrlen = sizeof (struct sockaddr_in);
   int resx, resy, reskeylen;
-  int fd;
   int reserr, ressuberr;
 
-  fd = socket (PF_INET, SOCK_DGRAM, 0);
-  if (fd <= 0)
+  if (server_fd < 0)
+    server_fd = socket (PF_INET, SOCK_DGRAM, 0);
+  if (server_fd <= 0)
     fprintf(stderr, "error = %s\n", strerror(errno));
-  assert (fd >= 0);
+  assert (server_fd >= 0);
 
   memset (&req, 0, sizeof (req));
   req.x = htonl (x);
   req.y = htonl (y);
   snprintf (req.filename, sizeof (req.filename), "%s", filename);
 
-  ret = sendto (fd, &req, sizeof (struct key_request_packet), 0,
+  ret = sendto (server_fd, &req, sizeof (struct key_request_packet), 0,
                 (struct sockaddr *) serv, sizeof (struct sockaddr_in));
   assert (ret == sizeof (struct key_request_packet));
-  ret = recvfrom (fd, &res, sizeof (struct key_response_packet),  0,
+  ret = recvfrom (server_fd, &res, sizeof (struct key_response_packet),  0,
                   (struct sockaddr *) &addr, &addrlen);
   assert (ret == sizeof (struct key_response_packet));
 
@@ -75,6 +75,5 @@ client_key_request (char *key, int *key_len, char *filename, int x, int y,
   memset (key, 0, *key_len);
   memcpy (key, res.key, reskeylen);
   *key_len = reskeylen;
-  close(fd);
 }
 

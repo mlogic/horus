@@ -75,13 +75,14 @@ horusio_write (int fd, const void *buf, size_t size)
 {
   int nbyte,ret,block_num;
   int i,leaf_level,config_fd;
-  off_t fdpos = 0;
+  off_t fdpos = 0,offset,written,actual_written;
   struct stat statbuf;
   char link_path[HORUS_MAX_FILENAME_LEN];
   char real_path[HORUS_MAX_FILENAME_LEN];
   struct horus_file_config c;
   char block_data[HORUS_BLOCK_SIZE];
   char block_storage[HORUS_BLOCK_SIZE];
+  char temp_buf[HORUS_BLOCK_SIZE];
   char *block;
 
   u_int8_t key[HORUS_KEY_LEN];
@@ -98,6 +99,9 @@ horusio_write (int fd, const void *buf, size_t size)
   {
     fdpos = lseek (fd, 0, SEEK_CUR);
     sprintf(link_path, "/proc/self/fd/%d", fd);
+/* BTIO test seems to delete old file, which breaks our system of
+ * using EA. As an alternative, we request keys from a different file */
+
 //    ret = readlink(link_path, real_path, HORUS_MAX_FILENAME_LEN);
 //    assert(ret>0);
 //    real_path[ret+1] = 0;
@@ -105,39 +109,67 @@ horusio_write (int fd, const void *buf, size_t size)
 
     config_fd = open(real_path, O_RDONLY);
     ret = horus_get_file_config (config_fd, &c);
-    if (ret < 0)
+    if (ret < 0 || !horus_is_valid_config (&c))
       {
-        goto sys_write;
-      }
-
-    if (! horus_is_valid_config (&c))
-      {
-        goto sys_write;
+          nbyte = (int) syscall (SYS_write, fd, buf, size);
+          goto exit;
       }
 
     /* calculate leaf level */
     for (i = 0; i < HORUS_MAX_KHT_DEPTH; i++)
       if (c.kht_block_size[i])
         leaf_level = i;
-    block_num = fdpos/HORUS_BLOCK_SIZE;
-
+    cipher = aes_xts_init ();
     serv_addr.sin_family = AF_INET;
     inet_pton(AF_INET, HORUS_KDS_SERVER_ADDR, &serv_addr.sin_addr);
     serv_addr.sin_port = htons (6666);
-    printf ("request: K_%lu,%lu\n", leaf_level, block_num);
-    client_key_request ((char *)key, &key_len, real_path,
-                       leaf_level, block_num, &serv_addr);
 
-    printf ("K_%lu,%lu = %s\n", leaf_level, block_num,
-            print_key ((char *)key, HORUS_KEY_LEN));
-//    aes_xts_init ();
-//    aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
+    for (written = 0; written != size; written += actual_written)
+    {
+      block_num = (fdpos + written)/HORUS_BLOCK_SIZE;
+      offset = (fdpos + written )% HORUS_BLOCK_SIZE;
+      client_key_request ((char *)key, &key_len, real_path,
+                          leaf_level, block_num, &serv_addr);
+      aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
+
+      if (offset == 0 && (size%HORUS_BLOCK_SIZE == 0 ||
+          size > HORUS_BLOCK_SIZE))
+      {
+        //Just encrypt
+        /* Use block id as IV */
+        *(unsigned long *)iv = block_num;
+        aes_xts_encrypt (cipher, block_storage, buf + written,
+                         HORUS_BLOCK_SIZE, iv); 
+        actual_written = (int) syscall (SYS_write, fd, block_storage, HORUS_BLOCK_SIZE);
+
+      }
+      else
+      {
+        //read one block
+        lseek (fd, fdpos-offset, SEEK_SET);
+        memset(temp_buf, 0, HORUS_BLOCK_SIZE);
+        nbyte = (int) syscall (SYS_read, fd, temp_buf, HORUS_BLOCK_SIZE);
+        //decrypt
+        *(unsigned long *)iv = block_num;
+        aes_xts_decrypt (cipher, block_storage, buf + written,
+                         HORUS_BLOCK_SIZE, iv);
+        memcpy(temp_buf + offset, buf + written,
+               MIN(HORUS_BLOCK_SIZE - offset, size - written));
+        aes_xts_encrypt (cipher, block_storage, temp_buf,
+                         HORUS_BLOCK_SIZE, iv);
+        syscall (SYS_write, fd, buf, size);
+        actual_written = MIN(HORUS_BLOCK_SIZE - offset, size - written);
+ 
+        //insert new data
+        //encrypt
+      }
+      lseek (fd, fdpos+written, SEEK_SET);
+      nbyte=written;
+    }
 
   }
 
-sys_write:
-  nbyte = (int) syscall (SYS_write, fd, buf, size);
-
+exit:
   if (S_ISREG (statbuf.st_mode))
     log_write (fd, fdpos, (void *) buf, nbyte, size);
 

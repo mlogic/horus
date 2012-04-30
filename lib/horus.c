@@ -21,6 +21,7 @@ int horus_debug = 0;
 int horus_verbose = 0;
 
 int is_init = 0;
+int server_fd = -1;
 
 /* libhorus tracks files by file descriptor. */
 fd_set fdset;
