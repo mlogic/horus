@@ -129,6 +129,7 @@ thread_read_write (void *arg)
   id = info->id;
 
   memset (&info->stats, 0, sizeof (struct horus_stats));
+  send_count = read_count = 0;
 
   fd = socket (PF_INET, SOCK_DGRAM, 0);
   if (fd < 0)
@@ -364,6 +365,7 @@ main (int argc, char **argv)
   int nservers = 0;
 
   memset (&serv_addr, 0, sizeof (serv_addr));
+  alevel = anblock = aboffset = 0;
 
   int nthread = 1;
 

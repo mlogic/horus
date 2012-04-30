@@ -138,7 +138,8 @@ horus_key_request (char *key, size_t *key_len, char *filename, int x, int y,
 int
 main (int argc, char **argv)
 {
-  int fd, sockfd, ret, ch;
+  int fd = -1, sockfd = -1;
+  int ret, ch;
   unsigned long i, j;
   unsigned long startb, endb;
   int ncount = 0;
@@ -179,6 +180,9 @@ main (int argc, char **argv)
   memset (&serv_addr, 0, sizeof (serv_addr));
   horus = encrypt = decrypt = aggregate = 0;
   readflag = writeflag = 0;
+  alevel = anblock = aboffset = 0;
+  rlevel = rnblock = rboffset = 0;
+  offset = length = size = 0;
 
   for (i = 0; i < HORUS_BLOCK_SIZE; i++)
     block_data[i] = (char) i;
