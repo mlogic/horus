@@ -25,7 +25,7 @@ extern int horus_verbose;
 int benchmark = 0;
 int aggregate = 0;
 
-const char *optstring = "hvdbegus:a:rwf:l:t:n:";
+const char *optstring = "hvdbegus:a:rwf:i:o:l:t:n:";
 const char *optusage = "\
 -h, --help        Display this help and exit\n\
 -v, --verbose     Turn on verbose mode\n\
@@ -39,6 +39,8 @@ const char *optusage = "\
 -r, --read        Do read\n\
 -w, --write       Do write\n\
 -f, --file        Specify the file name\n\
+-i, --input-file  Specify the input file name\n\
+-o, --output-file Specify the output file name\n\
 -l, --length      Specify size of the file (in bytes, e.g., 1G)\n\
 -t, --size        Specify size of the read/write unit (in bytes, e.g., 1G)\n\
 -n, --ncount      Specify the number of times to read/write\n\
@@ -57,6 +59,8 @@ const struct option longopts[] = {
   { "read",       no_argument,        NULL, 'r' },
   { "write",      no_argument,        NULL, 'w' },
   { "file",       required_argument,  NULL, 'f' },
+  { "input-file", required_argument,  NULL, 'i' },
+  { "output-file",required_argument,  NULL, 'o' },
   { "length",     required_argument,  NULL, 'l' },
   { "size",       required_argument,  NULL, 't' },
   { "ncount",     required_argument,  NULL, 'n' },
@@ -138,13 +142,14 @@ horus_key_request (char *key, size_t *key_len, char *filename, int x, int y,
 int
 main (int argc, char **argv)
 {
-  int fd = -1, sockfd = -1;
-  int ret, ch;
+  int fd = -1, inputfd = -1, outputfd = -1;
+  int sockfd = -1;
+  int ret = 0, ch;
   unsigned long i, j;
   unsigned long startb, endb;
   int ncount = 0;
   unsigned long long offset, length, size;
-  char *filename = NULL;
+  char *filename = NULL, *inputfile = NULL, *outputfile = NULL;
   char *endptr;
   int encrypt, decrypt, horus, readflag, writeflag;
   unsigned long leaf_level = HORUS_DEFAULT_LEAF_LEVEL;
@@ -269,6 +274,12 @@ main (int argc, char **argv)
         case 'f':
           filename = optarg;
           break;
+        case 'i':
+          inputfile = optarg;
+          break;
+        case 'o':
+          outputfile = optarg;
+          break;
         case 'l':
           length = canonical_byte_size (optarg, &endptr);
           if (*endptr != '\0')
@@ -315,8 +326,16 @@ main (int argc, char **argv)
 
   if (filename == NULL)
     {
-      printf ("specify filename to read/write\n");
+      printf ("specify target filename.\n");
       exit (1);
+    }
+
+  if (argc > 0)
+    {
+      printf ("unknown arguments ignored:");
+      for (i = 0; i < argc; i++)
+        printf (" %s", argv[i]);
+      printf ("\n");
     }
 
   if (horus && nservers == 0)
@@ -343,6 +362,25 @@ main (int argc, char **argv)
     {
       printf ("cannot open file: %s\n", filename);
       exit (1);
+    }
+
+  if (inputfile)
+    {
+      inputfd = open (inputfile, O_RDONLY);
+      if (inputfd < 0)
+        {
+          printf ("cannot open input file: %s\n", inputfile);
+          exit (1);
+        }
+    }
+  if (outputfile)
+    {
+      outputfd = open (outputfile, O_WRONLY | O_CREAT, 0644);
+      if (outputfd < 0)
+        {
+          printf ("cannot open output file: %s\n", outputfile);
+          exit (1);
+        }
     }
 
   memset (&c, 0, sizeof (c));
@@ -398,6 +436,10 @@ main (int argc, char **argv)
   if (horus_verbose || benchmark)
     {
       printf ("filename: %s\n", filename);
+      if (inputfile)
+        printf ("input file: %s\n", inputfile);
+      if (outputfile)
+        printf ("output file: %s\n", outputfile);
       if (benchmark)
         printf ("benchmark.\n");
       printf ("level: %lu boffset: %lu nblock: %lu\n",
@@ -502,7 +544,17 @@ main (int argc, char **argv)
             {
               if (horus_verbose)
                 printf ("      read();\n");
-              read (fd, block_storage, HORUS_BLOCK_SIZE);
+
+              /* read */
+              if (inputfd >= 0)
+                ret = read (inputfd, block_storage, HORUS_BLOCK_SIZE);
+              else
+                ret = read (fd, block_storage, HORUS_BLOCK_SIZE);
+              if (ret != HORUS_BLOCK_SIZE)
+                {
+                  if (horus_verbose)
+                    printf ("read failed: %s\n", strerror (errno));
+                }
               block = block_storage;
 
               if (decrypt)
@@ -551,7 +603,17 @@ main (int argc, char **argv)
 
               if (horus_verbose)
                 printf ("      write();\n");
-              write (fd, block, HORUS_BLOCK_SIZE);
+
+              /* write */
+              if (outputfd >= 0)
+                ret = write (outputfd, block, HORUS_BLOCK_SIZE);
+              else
+                ret = write (fd, block, HORUS_BLOCK_SIZE);
+              if (ret != HORUS_BLOCK_SIZE)
+                {
+                  if (horus_verbose)
+                    printf ("write failed: %s\n", strerror (errno));
+                }
 
               total_write++;
             }
@@ -563,8 +625,13 @@ main (int argc, char **argv)
   if (benchmark)
     gettimeofday (&end, NULL);
 
-  close (sockfd);
   close (fd);
+  if (inputfd >= 0)
+    close (inputfd);
+  if (outputfd >= 0)
+    close (outputfd);
+  if (sockfd >= 0)
+    close (sockfd);
 
   if (benchmark)
     {
