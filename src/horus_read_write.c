@@ -727,6 +727,9 @@ main (int argc, char **argv)
   if (sockfd >= 0)
     close (sockfd);
 
+  if (prefetch)
+    free (prefetch_key);
+
   if (benchmark)
     {
       unsigned long long bytes;
