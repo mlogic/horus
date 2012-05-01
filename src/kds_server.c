@@ -244,6 +244,8 @@ handle_kds_client (void *arg)
 
       if (horus_verbose)
         {
+          printf ("thread[%d]: replyed: K_%d,%d file: %s\n",
+                  id, ntohl (kresp.x), ntohl (kresp.y), kresp.filename);
           printf ("thread[%d]: sendto(): %s: ret: %d\n", id, buf, ret);
         }
     }

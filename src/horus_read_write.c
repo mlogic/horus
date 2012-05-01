@@ -13,6 +13,8 @@
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
 char *progname;
 
+#define HORUS_MAX_PREFETCH_KEY 9216
+
 extern char *optarg;
 extern int optind;
 extern int optopt;
@@ -25,7 +27,7 @@ extern int horus_verbose;
 int benchmark = 0;
 int aggregate = 0;
 
-const char *optstring = "hvdbegus:a:rwf:i:o:l:t:n:";
+const char *optstring = "hvdbegus:a:p:rwf:i:o:l:t:n:";
 const char *optusage = "\
 -h, --help        Display this help and exit\n\
 -v, --verbose     Turn on verbose mode\n\
@@ -36,6 +38,7 @@ const char *optusage = "\
 -u, --horus       Turn on Horus mode\n\
 -s, --server      Specify server IP address A.B.C.D[:P] (default: %s:%d)\n\
 -a, --aggregate   Specify the level of aggregation of request range keys\n\
+-p, --prefetch    Specify the number of key to prefetch\n\
 -r, --read        Do read\n\
 -w, --write       Do write\n\
 -f, --file        Specify the file name\n\
@@ -56,6 +59,7 @@ const struct option longopts[] = {
   { "horus",      no_argument,        NULL, 'u' },
   { "server",     required_argument,  NULL, 's' },
   { "aggregate",  required_argument,  NULL, 'a' },
+  { "prefetch",   required_argument,  NULL, 'p' },
   { "read",       no_argument,        NULL, 'r' },
   { "write",      no_argument,        NULL, 'w' },
   { "file",       required_argument,  NULL, 'f' },
@@ -139,6 +143,56 @@ horus_key_request (char *key, size_t *key_len, char *filename, int x, int y,
   *key_len = (size_t) reskeylen;
 }
 
+void
+horus_key_prefetch (char *filename, int x, int y, int num,
+                    int sockfd, struct sockaddr_in *serv,
+                    struct key_response_packet *prefetch_key)
+{
+  int ret;
+  struct key_request_packet req;
+  struct key_response_packet res;
+  struct sockaddr_in addr;
+  socklen_t addrlen = sizeof (struct sockaddr_in);
+  int resx, resy, reskeylen;
+  int reserr, ressuberr;
+  int i, received;
+
+  for (i = 0; i < num; i++)
+    {
+      memset (&req, 0, sizeof (req));
+      req.x = htonl (x);
+      req.y = htonl (y + i);
+      snprintf (req.filename, sizeof (req.filename), "%s", filename);
+
+      ret = sendto (sockfd, &req, sizeof (struct key_request_packet), 0,
+                    (struct sockaddr *) serv, sizeof (struct sockaddr_in));
+      assert (ret == sizeof (struct key_request_packet));
+    }
+
+  received = 0;
+  while (received < num)
+    {
+      ret = recvfrom (sockfd, &res, sizeof (struct key_response_packet),  0,
+                      (struct sockaddr *) &addr, &addrlen);
+      assert (ret == sizeof (struct key_response_packet));
+
+      resx = ntohl (res.x);
+      resy = ntohl (res.y);
+      if (x != resx || resy < y || y + num < resy)
+        {
+          printf ("wrong key: K_%d,%d\n", resx, resy);
+          continue;
+        }
+
+      if (horus_verbose)
+        printf ("received key[%d]: K_%d,%d\n", received, resx, resy);
+
+      memcpy (&prefetch_key[resy - y], &res,
+              sizeof (struct key_response_packet));
+      received++;
+    }
+}
+
 int
 main (int argc, char **argv)
 {
@@ -152,6 +206,8 @@ main (int argc, char **argv)
   char *filename = NULL, *inputfile = NULL, *outputfile = NULL;
   char *endptr;
   int encrypt, decrypt, horus, readflag, writeflag;
+  int prefetch = 0;
+  struct key_response_packet *prefetch_key;
   unsigned long leaf_level = HORUS_DEFAULT_LEAF_LEVEL;
   unsigned long level, boffset, nblock;
   unsigned long alevel, aboffset, anblock;
@@ -262,6 +318,19 @@ main (int argc, char **argv)
           if (alevel < 0 || HORUS_MAX_KHT_DEPTH <= alevel)
             {
               fprintf (stderr, "invalid alevel: %lu\n", alevel);
+              return -1;
+            }
+          break;
+        case 'p':
+          prefetch = strtol (optarg, &endptr, 0);
+          if (*endptr != '\0')
+            {
+              fprintf (stderr, "invalid \'%c\' in %s\n", *endptr, optarg);
+              return -1;
+            }
+          if (prefetch < 0 || HORUS_MAX_PREFETCH_KEY < prefetch)
+            {
+              fprintf (stderr, "invalid prefetch: %d\n", prefetch);
               return -1;
             }
           break;
@@ -447,6 +516,8 @@ main (int argc, char **argv)
       if (aggregate)
         printf ("alevel: %lu aboffset: %lu anblock: %lu\n",
                 alevel, aboffset, anblock);
+      if (prefetch)
+        printf ("prefetch: %d\n", prefetch);
       printf ("flags: ");
       if (encrypt)
         printf (" encrypt");
@@ -484,6 +555,15 @@ main (int argc, char **argv)
       rnblock = anblock;
     }
 
+  if (horus && prefetch)
+    {
+      prefetch_key = (struct key_response_packet *)
+        malloc (prefetch * sizeof (struct key_response_packet));
+      assert (prefetch_key);
+      memset (prefetch_key, 0,
+              prefetch * sizeof (struct key_response_packet));
+    }
+
   if (benchmark)
     gettimeofday (&start, NULL);
 
@@ -492,7 +572,15 @@ main (int argc, char **argv)
       if (horus_verbose)
         printf ("for level: %lu block: %lu\n", rlevel, i);
 
-      if (horus)
+      if (horus && prefetch)
+        {
+          if (i % prefetch == 0)
+            horus_key_prefetch (filename, rlevel, i, prefetch,
+                                sockfd, &serv_addr[0], prefetch_key);
+          rkey_len = ntohl (prefetch_key[i % prefetch].key_len);
+          memcpy (rkey, prefetch_key[i % prefetch].key, rkey_len);
+        }
+      else if (horus)
         {
           /* key request */
           if (horus_verbose)
