@@ -237,6 +237,7 @@ main (int argc, char **argv)
   unsigned long total, total_read, total_write;
   unsigned long total_encrypt, total_decrypt;
   struct timeval start, end, res;
+  struct timeval startnet, endnet, resnet, sumnet;
 
   memset (&serv_addr, 0, sizeof (serv_addr));
   horus = encrypt = decrypt = aggregate = 0;
@@ -562,6 +563,7 @@ main (int argc, char **argv)
       assert (prefetch_key);
       memset (prefetch_key, 0,
               prefetch * sizeof (struct key_response_packet));
+      memset (&sumnet, 0, sizeof (sumnet));
     }
 
   if (benchmark)
@@ -574,11 +576,15 @@ main (int argc, char **argv)
 
       if (horus && prefetch)
         {
+          gettimeofday (&startnet, NULL);
           if (i % prefetch == 0)
             horus_key_prefetch (filename, rlevel, i, prefetch,
                                 sockfd, &serv_addr[0], prefetch_key);
           rkey_len = ntohl (prefetch_key[i % prefetch].key_len);
           memcpy (rkey, prefetch_key[i % prefetch].key, rkey_len);
+          gettimeofday (&endnet, NULL);
+          timeval_sub (&endnet, &startnet, &resnet);
+          timeval_merge (&sumnet, &resnet);
         }
       else if (horus)
         {
@@ -725,6 +731,7 @@ main (int argc, char **argv)
     {
       unsigned long long bytes;
       double time, Bps, IOps;
+      double timenet;
 
       timeval_sub (&end, &start, &res);
       time = res.tv_sec + res.tv_usec * 0.000001;
@@ -737,6 +744,11 @@ main (int argc, char **argv)
       printf ("horus: reqlevel: %lu #reqkeys %lu\n", rlevel, rnblock);
       printf ("time: length %llu nblock: %lu time %f secs\n",
               length, total, time);
+      if (prefetch)
+        {
+          timenet = sumnet.tv_sec + sumnet.tv_usec * 0.000001;
+          printf ("prefetch: #keys: %d time: %f secs\n", prefetch, timenet);
+        }
       printf ("I/Ops: %f I/Ops Bps: %f Bps\n", IOps, Bps);
     }
 
