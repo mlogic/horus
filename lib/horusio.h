@@ -1,5 +1,10 @@
 #ifndef _HORUSIO_C_
 #define _HORUSIO_C_
+ssize_t
+horusio_decrypt(char *buf, ssize_t size,ssize_t fdpos);
+
+ssize_t
+horusio_encrypt(char *buf, ssize_t size,ssize_t fdpos);
 int
 horusio_open (const char *path, int oflag, ...);
 

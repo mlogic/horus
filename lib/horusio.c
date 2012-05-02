@@ -3,8 +3,34 @@
 
 #include <log.h>
 #include <kds_protocol.h>
+#include <xts.h>
+#include <openssl/md5.h>
+#include <unistd.h>
 
 #define TEST_PATH "/home/nakul/horus"
+#define DUMMY_PATH "/home/nakul/horus/testfile"
+#define HORUS_BLOCK_SIZE1 480
+int counter=0;
+
+int md5sum_nakul(char *buf, int size)
+{
+        int n;
+        MD5_CTX c;
+        int i;
+        char out[MD5_DIGEST_LENGTH];
+        MD5_Init(&c);
+        for (i=0;i<size;i++)
+          MD5_Update(&c, buf+i, 1);
+
+        MD5_Final(out, &c);
+
+        for(n=0; n<MD5_DIGEST_LENGTH; n++)
+                fprintf(stderr,"%02x", out[n]);
+        fprintf(stderr," ");
+
+        return(0);        
+}
+
 int
 horusio_open (const char *path, int oflag, ...)
 {
@@ -38,6 +64,9 @@ horusio_socket (int domain, int type, int protocol)
 {
   int fd = -1;
 
+  u_int8_t key[32];
+  u_int8_t iv[32];
+
   fd = (int) syscall (SYS_socket, domain, type, protocol);
   log_socket (fd, domain, type, protocol);
 
@@ -45,6 +74,152 @@ horusio_socket (int domain, int type, int protocol)
 }
 #endif /*SYS_socket*/
 
+ssize_t
+horusio_decrypt(char *buf, size_t size,ssize_t fdpos)
+{
+  int i, ret, total_blocks,offset,config_fd;
+  int block_num, leaf_level;
+  struct horus_file_config c;
+  char *tbuf=NULL;
+  struct aes_xts_cipher *cipher = NULL;
+  int key_len = HORUS_KEY_LEN;
+  struct sockaddr_in serv_addr;
+  u_int8_t key[32];
+  u_int8_t iv[32];
+
+  memset (key, 0, sizeof(key));
+  memset (iv, 0, sizeof(iv));
+  tbuf = malloc(size);
+
+  config_fd = open(DUMMY_PATH, O_RDONLY);
+  ret = horus_get_file_config (config_fd, &c);
+  if (ret < 0 || !horus_is_valid_config (&c))
+  {
+    return -1;
+  }
+  close(config_fd);
+  for (i = 0; i < HORUS_MAX_KHT_DEPTH; i++)
+    if (c.kht_block_size[i])
+      leaf_level = i;
+  cipher = aes_xts_init ();
+  serv_addr.sin_family = AF_INET;
+  inet_pton(AF_INET, HORUS_KDS_SERVER_ADDR, &serv_addr.sin_addr);
+  serv_addr.sin_port = htons (6666);
+  block_num = fdpos /HORUS_BLOCK_SIZE1;
+
+  total_blocks = size / HORUS_BLOCK_SIZE1;
+    if (aes_xts_setkey (cipher, key, 32) != 0)
+    {
+      printf ("aes_xts_setkey error! %s",strerror(errno));
+      abort ();
+    }
+
+  for (i=0; i<total_blocks;i++)
+  {
+    offset = i * HORUS_BLOCK_SIZE1;
+    memset (key, 0, sizeof(key));
+    client_key_request ((char *)key, &key_len, DUMMY_PATH,
+                        leaf_level, block_num+i, &serv_addr);
+    if (aes_xts_setkey (cipher, key, 32) != 0)
+    {
+      printf ("aes_xts_setkey error! %s",strerror(errno));
+      abort ();
+    }
+    memset (iv, 1, sizeof(iv));
+fprintf(stderr, "\ndecrypt %d ", counter);
+md5sum_nakul(buf,size);
+
+    aes_xts_decrypt (cipher, tbuf+offset, buf+offset,
+                     HORUS_BLOCK_SIZE1, iv);
+/*    memset (iv, 0, sizeof(iv));
+    aes_xts_encrypt (cipher, buf+offset, tbuf+offset,
+                     HORUS_BLOCK_SIZE1, iv);
+    memcpy(tbuf+offset, buf+offset, HORUS_BLOCK_SIZE1);*/
+
+
+  }
+  memcpy(buf,tbuf,size);
+  fprintf(stderr, "decrypt %d \n", counter);
+  counter++;
+  md5sum_nakul(buf,size);
+  if (tbuf)
+    free(tbuf);
+  if (cipher)
+    free(cipher);
+  return size;
+}
+
+ssize_t
+horusio_encrypt(char *buf, size_t size, ssize_t fdpos)
+{
+  int i, ret, total_blocks,offset,config_fd;
+  int block_num, leaf_level;
+  struct horus_file_config c;
+  char *tbuf=NULL;
+  struct aes_xts_cipher *cipher = NULL;
+  int key_len = HORUS_KEY_LEN;
+  struct sockaddr_in serv_addr;
+  u_int8_t key[32];
+  u_int8_t iv[32];
+
+  memset (key, 0, sizeof(key));
+  memset (iv, 0, sizeof(iv));
+
+  tbuf = malloc(size);
+  config_fd = open(DUMMY_PATH, O_RDONLY);
+  ret = horus_get_file_config (config_fd, &c);
+  if (ret < 0 || !horus_is_valid_config (&c))
+  {
+    return -1;
+  }
+  close(config_fd);
+  for (i = 0; i < HORUS_MAX_KHT_DEPTH; i++)
+    if (c.kht_block_size[i])
+      leaf_level = i;
+  cipher = aes_xts_init ();
+  serv_addr.sin_family = AF_INET;
+  inet_pton(AF_INET, HORUS_KDS_SERVER_ADDR, &serv_addr.sin_addr);
+  serv_addr.sin_port = htons (6666);
+  block_num = fdpos /HORUS_BLOCK_SIZE1;
+
+  total_blocks = size / HORUS_BLOCK_SIZE1;
+    if (aes_xts_setkey (cipher, key, 32) != 0)
+    {
+      printf ("aes_xts_setkey error! %s",strerror(errno));
+      abort ();
+    }
+
+  for (i=0; i<total_blocks;i++)
+  {
+    offset = i * HORUS_BLOCK_SIZE1;
+    memset (key, 0, sizeof(key));
+    client_key_request ((char *)key, &key_len, DUMMY_PATH,
+                        leaf_level, block_num+i, &serv_addr);
+    if (aes_xts_setkey (cipher, key, 32) != 0)
+    {
+      printf ("aes_xts_setkey error! %s",strerror(errno));
+      abort ();
+    }
+    memset (iv, 1, sizeof(iv));
+fprintf(stderr, "\nencrypt %d ", counter);
+md5sum_nakul(buf,size);
+    aes_xts_encrypt (cipher, tbuf+offset, buf+offset,
+                     HORUS_BLOCK_SIZE1, iv);
+/*    memset (iv, 0, sizeof(iv));
+    aes_xts_decrypt (cipher, buf+offset, tbuf+offset,
+                     HORUS_BLOCK_SIZE1, iv);
+    memcpy(tbuf+offset, buf+offset, HORUS_BLOCK_SIZE1);*/
+
+  }
+  memcpy(buf,tbuf,size);
+  counter++;
+  md5sum_nakul(buf,size);
+  if (tbuf)
+    free(tbuf);
+  if (cipher)
+    free(cipher);
+  return size;
+}
 ssize_t
 horusio_read (int fd, void *buf, size_t size)
 {
@@ -55,11 +230,8 @@ horusio_read (int fd, void *buf, size_t size)
   char link_path[HORUS_MAX_FILENAME_LEN];
   char real_path[HORUS_MAX_FILENAME_LEN];
   struct horus_file_config c;
-  char block_data[HORUS_BLOCK_SIZE];
   char block_storage[HORUS_BLOCK_SIZE];
   char temp_buf[HORUS_BLOCK_SIZE];
-  char *block;
-  unsigned char *p;
   char *tbuf=NULL;
 
   u_int8_t key[32];
@@ -181,9 +353,6 @@ horusio_read (int fd, void *buf, size_t size)
     }
   }
 
-  p = buf;
-//  printf("read end: fdpos = %u size = %u buf[0] = %u temp_buf[0] = %u nbyte = %d\n", fdpos, size, p[0], (unsigned char)temp_buf[0], nbyte);
-
 exit:
   if (cipher)
     free(cipher);
@@ -200,11 +369,8 @@ horusio_write (int fd, const void *buf, size_t size)
   char link_path[HORUS_MAX_FILENAME_LEN];
   char real_path[HORUS_MAX_FILENAME_LEN];
   struct horus_file_config c;
-  char block_data[HORUS_BLOCK_SIZE];
   char block_storage[HORUS_BLOCK_SIZE];
   char temp_buf[HORUS_BLOCK_SIZE];
-  char *block;
-  unsigned char *p;
 
   u_int8_t key[32];
   u_int8_t iv[32];
@@ -257,8 +423,6 @@ horusio_write (int fd, const void *buf, size_t size)
     inet_pton(AF_INET, HORUS_KDS_SERVER_ADDR, &serv_addr.sin_addr);
     serv_addr.sin_port = htons (6666);
 
-    p = buf;
-//    printf("write: fdpos = %u, size = %u buf[0] = %u\n", fdpos, size, p[0]);
     actual_written = 0;
     block_num = fdpos /HORUS_BLOCK_SIZE;
     offset = fdpos % HORUS_BLOCK_SIZE;;
@@ -289,7 +453,7 @@ horusio_write (int fd, const void *buf, size_t size)
       }
       else
       {
-        printf("inside non-aligned!\n");
+//        printf("inside non-aligned!\n");
          if (offset == 0 && (size%HORUS_BLOCK_SIZE == 0 ||
             size > HORUS_BLOCK_SIZE))
         {
@@ -388,5 +552,4 @@ horusio_dup2 (int fd, int fd2)
 
   return syscall (SYS_dup2, fd, fd2);
 }
-
 
