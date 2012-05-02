@@ -69,9 +69,9 @@ static inline void xts_round(struct sinfo *s, void *dst, const void *src)
   be128_xor(dst, dst, s->t);		/* C <- T xor CC */
 }
 
-void crypt(struct aes_xts_cipher *ctx,
-	   void *dst, const void *src, size_t nbytes, void *iv,
-	   void (*fn)(const struct aes_cipher *, u8 *, const u8 *))
+void aes_crypt(struct aes_xts_cipher *ctx,
+	       void *dst, const void *src, size_t nbytes, void *iv,
+	       void (*fn)(const struct aes_cipher *, u8 *, const u8 *))
 {
   const int bs = CIPHER_BLOCK_SIZE;
   struct sinfo s = {
@@ -102,14 +102,14 @@ void crypt(struct aes_xts_cipher *ctx,
 void aes_xts_encrypt(struct aes_xts_cipher *ctx, void *dst,
 	    const void *src, size_t nbytes, void *iv)
 {
-  crypt(ctx, dst, src, nbytes, iv,
+  aes_crypt(ctx, dst, src, nbytes, iv,
 	aes_encrypt);
 }
 
 void aes_xts_decrypt(struct aes_xts_cipher *ctx, void *dst,
 		     const void *src, size_t nbytes, void *iv)
 {
-  crypt(ctx, dst, src, nbytes, iv,
+  aes_crypt(ctx, dst, src, nbytes, iv,
 	aes_decrypt);
 }
 
