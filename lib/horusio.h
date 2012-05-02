@@ -1,15 +1,13 @@
 #ifndef _HORUSIO_C_
 #define _HORUSIO_C_
-ssize_t
-horusio_decrypt(char *buf, ssize_t size,ssize_t fdpos);
 
+#define HORUSIO_ENCRYPT 1
+#define HORUSIO_DECRYPT 2
 ssize_t
-horusio_encrypt(char *buf, ssize_t size,ssize_t fdpos);
+horusio_crypt(char *buf,ssize_t size,ssize_t fdpos, int op);
+
 int
 horusio_open (const char *path, int oflag, ...);
-
-int
-horusio_socket (int domain, int type, int protocol);
 
 ssize_t
 horusio_read (int fd, void *buf, size_t size);
