@@ -8,6 +8,7 @@
 #include <benchmark.h>
 #include "timeval.h"
 
+#include <aes.h>
 #include <xts.h>
 
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
@@ -227,11 +228,13 @@ main (int argc, char **argv)
   char block_data[HORUS_BLOCK_SIZE];
   char block_storage[HORUS_BLOCK_SIZE];
 
-  u_int8_t key[HORUS_KEY_LEN];
+  char key[HORUS_KEY_LEN];
   size_t key_len = HORUS_KEY_LEN;
-  u_int8_t rkey[HORUS_KEY_LEN];
+  char rkey[HORUS_KEY_LEN];
   size_t rkey_len = HORUS_KEY_LEN;
-  u_int8_t iv[HORUS_KEY_LEN];
+
+  u_int8_t aeskey[AES_KEYSIZE_128 * 2];
+  u_int8_t iv[AES_KEYSIZE_128 * 2];
   struct aes_xts_cipher *cipher;
 
   unsigned long total, total_read, total_write;
@@ -249,7 +252,7 @@ main (int argc, char **argv)
   for (i = 0; i < HORUS_BLOCK_SIZE; i++)
     block_data[i] = (char) i;
   memset (key, 0, sizeof (key));
-  memset (rkey, 0, sizeof (key));
+  memset (rkey, 0, sizeof (rkey));
   memset (iv, 0, sizeof (iv));
 
   total = total_read = total_write = 0;
@@ -625,10 +628,18 @@ main (int argc, char **argv)
                 printf ("    calculate leaf key: K_%lu,%lu = %s\n",
                         leaf_level, j, print_key ((char *)key, HORUS_KEY_LEN));
             }
+          else
+            {
+              memcpy (key, rkey, HORUS_KEY_LEN);
+              key_len = HORUS_KEY_LEN;
+            }
 
           if (encrypt || decrypt)
             {
-              aes_xts_setkey (cipher, key, HORUS_KEY_LEN);
+              memset (aeskey, 0, AES_KEYSIZE_128 * 2);
+              memcpy (aeskey, key, HORUS_KEY_LEN);
+              ret = aes_xts_setkey (cipher, aeskey, AES_KEYSIZE_128 * 2);
+              assert (! ret);
               if (horus_verbose)
                 printf ("    crypt key: = %s\n",
                         print_key ((char *)key, HORUS_KEY_LEN));
@@ -654,10 +665,11 @@ main (int argc, char **argv)
               if (decrypt)
                 {
                   if (horus_verbose)
-                    printf ("      decrypt by key: %s.\n",
-                            print_key ((char *)key, HORUS_KEY_LEN));
+                    printf ("      decrypt by key: %s iv: %lu\n",
+                            print_key ((char *)key, HORUS_KEY_LEN), j);
 
                   /* Use block id as IV */
+                  memset (iv, 0, sizeof (iv));
                   *(unsigned long *)iv = j;
                   aes_xts_decrypt (cipher, block_data, block_storage,
                                    HORUS_BLOCK_SIZE, iv);
@@ -683,10 +695,11 @@ main (int argc, char **argv)
               if (encrypt)
                 {
                   if (horus_verbose)
-                    printf ("      encrypt by key: %s.\n",
-                            print_key ((char *)key, HORUS_KEY_LEN));
+                    printf ("      encrypt by key: %s iv: %lu.\n",
+                            print_key ((char *)key, HORUS_KEY_LEN), j);
 
                   /* Use block id as IV */
+                  memset (iv, 0, sizeof (iv));
                   *(unsigned long *)iv = j;
                   aes_xts_encrypt (cipher, block_storage, block_data,
                                    HORUS_BLOCK_SIZE, iv);
