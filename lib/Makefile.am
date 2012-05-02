@@ -1,6 +1,6 @@
 AM_CPPFLAGS = -I$(top_srcdir)/aes  -I$(top_srcdir)/lib @OPENSSL_INCLUDES@
 
-AM_LDFLAGS =  -laes
+AM_LDFLAGS = ../aes/libaes.la
 lib_LTLIBRARIES = libhorus.la
 libhorus_la_SOURCES = \
     log.c log.h network.c network.h \
