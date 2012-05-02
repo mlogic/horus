@@ -211,7 +211,7 @@ horusio_write (int fd, const void *buf, size_t size)
   struct aes_xts_cipher *cipher = NULL;
   int key_len = HORUS_KEY_LEN;
   struct sockaddr_in serv_addr;
-  char *tbuf;
+  char *tbuf = NULL;
   memset (key, 0, sizeof(key));
   memset (iv, 0, sizeof(iv));
 
