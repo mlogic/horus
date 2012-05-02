@@ -4,7 +4,7 @@
 #include <log.h>
 #include <kds_protocol.h>
 
-#define TEST_PATH "a/home/nakul/horus"
+#define TEST_PATH "/home/nakul/horus"
 int
 horusio_open (const char *path, int oflag, ...)
 {
@@ -49,7 +49,7 @@ ssize_t
 horusio_read (int fd, void *buf, size_t size)
 {
   int nbyte,ret,block_num,test_path_len;
-  int i,leaf_level,config_fd,do_horus = 0;
+  int i,leaf_level,config_fd,do_horus = 0, aligned_read = 0;
   off_t fdpos = 0,internal_offset,data_read,actual_read;
   struct stat statbuf;
   char link_path[HORUS_MAX_FILENAME_LEN];
@@ -60,11 +60,11 @@ horusio_read (int fd, void *buf, size_t size)
   char temp_buf[HORUS_BLOCK_SIZE];
   char *block;
   unsigned char *p;
-  
+  char *tbuf=NULL;
 
   u_int8_t key[32];
   u_int8_t iv[32];
-  struct aes_xts_cipher *cipher;
+  struct aes_xts_cipher *cipher = NULL;
   int key_len = HORUS_KEY_LEN;
   struct sockaddr_in serv_addr;
   memset (key, 0, sizeof(key));
@@ -99,7 +99,7 @@ horusio_read (int fd, void *buf, size_t size)
     if (ret < 0 || !horus_is_valid_config (&c) || do_horus == 0)
       {
           nbyte = (int) syscall (SYS_read, fd, buf, size);
-          goto exit1;
+          goto exit;
       }
     close(config_fd);
     /* calculate leaf level */
@@ -111,6 +111,15 @@ horusio_read (int fd, void *buf, size_t size)
     inet_pton(AF_INET, HORUS_KDS_SERVER_ADDR, &serv_addr.sin_addr);
     serv_addr.sin_port = htons (6666);
 
+    block_num = fdpos /HORUS_BLOCK_SIZE;
+    internal_offset = fdpos % HORUS_BLOCK_SIZE;;
+    if (internal_offset == 0 && (size%HORUS_BLOCK_SIZE == 0))
+      aligned_read = 1;
+    if (aligned_read)
+    {
+      tbuf=malloc(size);
+      nbyte = (int) syscall (SYS_read, fd, tbuf, size);
+    }
     for (data_read = 0; data_read < size; data_read += actual_read)
     {
       block_num = (fdpos + data_read)/HORUS_BLOCK_SIZE;
@@ -124,60 +133,67 @@ horusio_read (int fd, void *buf, size_t size)
       }
 
 
-      if (internal_offset == 0 && (size%HORUS_BLOCK_SIZE == 0 ||
-          size > HORUS_BLOCK_SIZE))
+      if (aligned_read)
       {
-        //Just decrypt
-        nbyte = (int) syscall (SYS_read, fd, temp_buf, HORUS_BLOCK_SIZE);
-        if(nbyte == 0)
-          goto exit;
-        /* Use block id as IV */
         memset (iv, 0, sizeof(iv));
-//        *(unsigned long *)iv = block_num+1;
-
-        aes_xts_decrypt (cipher, block_storage, temp_buf,
+        aes_xts_decrypt (cipher, buf+data_read, tbuf+data_read,
                          HORUS_BLOCK_SIZE, iv);
-        memcpy(buf+data_read, block_storage, HORUS_BLOCK_SIZE);
-        actual_read = HORUS_BLOCK_SIZE;
-
       }
       else
-      {
-        //read one block
-        lseek (fd, fdpos+data_read-internal_offset, SEEK_SET);
-        memset(temp_buf, 0, HORUS_BLOCK_SIZE);
-        nbyte = (int) syscall (SYS_read, fd, temp_buf, HORUS_BLOCK_SIZE);
-        if (nbyte == 0)
-          goto exit;
-        //decrypt
-        memset (iv, 0, sizeof(iv));
-//        *(unsigned long *)iv = block_num+1;
-        aes_xts_decrypt (cipher, block_storage, temp_buf,
-                         HORUS_BLOCK_SIZE, iv);
-        memcpy(buf + data_read, block_storage + internal_offset,
-               MIN(HORUS_BLOCK_SIZE - internal_offset, size - data_read));
-        actual_read = MIN(HORUS_BLOCK_SIZE - internal_offset, size - data_read);
+      { 
+        if (internal_offset == 0 && (size%HORUS_BLOCK_SIZE == 0 ||
+            size > HORUS_BLOCK_SIZE))
+        {
+          //Just decrypt
+          nbyte = (int) syscall (SYS_read, fd, temp_buf, HORUS_BLOCK_SIZE);
+          if(nbyte == 0)
+            goto exit;
+          memset (iv, 0, sizeof(iv));
 
+          aes_xts_decrypt (cipher, block_storage, temp_buf,
+                           HORUS_BLOCK_SIZE, iv);
+          memcpy(buf+data_read, block_storage, HORUS_BLOCK_SIZE);
+          actual_read = HORUS_BLOCK_SIZE;
+
+        }
+        else
+        {
+          //read one block
+          lseek (fd, fdpos+data_read-internal_offset, SEEK_SET);
+          memset(temp_buf, 0, HORUS_BLOCK_SIZE);
+          nbyte = (int) syscall (SYS_read, fd, temp_buf, HORUS_BLOCK_SIZE);
+          if (nbyte == 0)
+           goto exit;
+          //decrypt
+          memset (iv, 0, sizeof(iv));
+          aes_xts_decrypt (cipher, block_storage, temp_buf,
+                           HORUS_BLOCK_SIZE, iv);
+          memcpy(buf + data_read, block_storage + internal_offset,
+                 MIN(HORUS_BLOCK_SIZE - internal_offset, size - data_read));
+          actual_read = MIN(HORUS_BLOCK_SIZE - internal_offset, size - data_read);
+        }
       }
     }
-    lseek (fd, fdpos+actual_read, SEEK_SET);
-    nbyte=data_read;
+    if (!aligned_read)
+    {
+      lseek (fd, fdpos+actual_read, SEEK_SET);
+      nbyte=data_read;
+    }
   }
 
   p = buf;
 //  printf("read end: fdpos = %u size = %u buf[0] = %u temp_buf[0] = %u nbyte = %d\n", fdpos, size, p[0], (unsigned char)temp_buf[0], nbyte);
 
 exit:
-  if (cipher>0)
+  if (cipher)
     free(cipher);
-exit1:
   return (ssize_t) nbyte;
 }
 
 ssize_t
 horusio_write (int fd, const void *buf, size_t size)
 {
-  int nbyte,ret,block_num,do_horus=0;
+  int nbyte,ret,block_num,do_horus=0,aligned_write=0;
   int i,leaf_level,config_fd,test_path_len;
   off_t fdpos = 0,offset,written,actual_written;
   struct stat statbuf;
@@ -192,9 +208,10 @@ horusio_write (int fd, const void *buf, size_t size)
 
   u_int8_t key[32];
   u_int8_t iv[32];
-  struct aes_xts_cipher *cipher;
+  struct aes_xts_cipher *cipher = NULL;
   int key_len = HORUS_KEY_LEN;
   struct sockaddr_in serv_addr;
+  char *tbuf;
   memset (key, 0, sizeof(key));
   memset (iv, 0, sizeof(iv));
 
@@ -227,9 +244,11 @@ horusio_write (int fd, const void *buf, size_t size)
     if (ret < 0 || !horus_is_valid_config (&c) || do_horus == 0)
       {
           nbyte = (int) syscall (SYS_write, fd, buf, size);
-          goto exit1;
+          goto exit;
       }
 
+    tbuf = malloc(size);
+    memset(tbuf, 0, size);
     /* calculate leaf level */
     for (i = 0; i < HORUS_MAX_KHT_DEPTH; i++)
       if (c.kht_block_size[i])
@@ -241,6 +260,11 @@ horusio_write (int fd, const void *buf, size_t size)
     p = buf;
 //    printf("write: fdpos = %u, size = %u buf[0] = %u\n", fdpos, size, p[0]);
     actual_written = 0;
+    block_num = fdpos /HORUS_BLOCK_SIZE;
+    offset = fdpos % HORUS_BLOCK_SIZE;;
+    if (offset == 0 && (size%HORUS_BLOCK_SIZE == 0))
+      aligned_write = 1;
+
     for (written = 0; written < size; written += actual_written)
     {
       block_num = (fdpos + written)/HORUS_BLOCK_SIZE;
@@ -256,58 +280,70 @@ horusio_write (int fd, const void *buf, size_t size)
         printf ("aes_xts_setkey err %d\n",ret);
         abort();
       }
-      if (offset == 0 && (size%HORUS_BLOCK_SIZE == 0 ||
-          size > HORUS_BLOCK_SIZE))
+      if (aligned_write)
       {
-        //Just encrypt
-        /* Use block id as IV */
-//        *(unsigned long *)iv = block_num+1;
         memset (iv, 0, sizeof(iv));
-        aes_xts_encrypt (cipher, block_storage, buf + written,
-                         HORUS_BLOCK_SIZE, iv); 
-        actual_written = nbyte = (int) syscall (SYS_write, fd, block_storage, HORUS_BLOCK_SIZE);
-
+        aes_xts_encrypt (cipher, tbuf+written, buf + written,
+                         HORUS_BLOCK_SIZE, iv);
+        actual_written+=HORUS_BLOCK_SIZE;
       }
       else
       {
-        lseek (fd, fdpos-offset+written, SEEK_SET);
-        memset(temp_buf, 0, HORUS_BLOCK_SIZE);
-        nbyte = (int) syscall (SYS_read, fd, temp_buf, HORUS_BLOCK_SIZE);
-        if (nbyte)
+        printf("inside non-aligned!\n");
+         if (offset == 0 && (size%HORUS_BLOCK_SIZE == 0 ||
+            size > HORUS_BLOCK_SIZE))
         {
-//          *(unsigned long *)iv = block_num+1;
+          //Just encrypt
+          /* Use block id as IV */
+//        *(unsigned long *)iv = block_num+1;
           memset (iv, 0, sizeof(iv));
-          aes_xts_decrypt (cipher, block_storage, temp_buf,
-                           HORUS_BLOCK_SIZE, iv);
-//          printf("block_storage _ decrypted = %s\n",block_storage);
-          memcpy(block_storage + offset, buf + written,
-                 MIN(HORUS_BLOCK_SIZE - offset, size - written));
+          aes_xts_encrypt (cipher, block_storage, buf + written,
+                           HORUS_BLOCK_SIZE, iv); 
+          actual_written = nbyte = (int) syscall (SYS_write, fd, block_storage, HORUS_BLOCK_SIZE);
+  
         }
         else
-          memcpy(block_storage,buf+written,MIN(HORUS_BLOCK_SIZE - offset, size - written));
-//        printf("block_storage _ new data = %s\n",block_storage);
-//        *(unsigned long *)iv = block_num+1;
-        memset (iv, 0, sizeof(iv));
-        aes_xts_encrypt (cipher, temp_buf, block_storage,
-                         HORUS_BLOCK_SIZE, iv);
-//        *(unsigned long *)iv = block_num+1;
-        memset (iv, 0, sizeof(iv));        
-        memset(block_storage, 0, HORUS_BLOCK_SIZE);
-        lseek (fd, fdpos-offset+written, SEEK_SET);
-        nbyte = syscall (SYS_write, fd, temp_buf, HORUS_BLOCK_SIZE);
-        actual_written = MIN(HORUS_BLOCK_SIZE - offset, size - written);
- 
+        {
+          lseek (fd, fdpos-offset+written, SEEK_SET);
+          memset(temp_buf, 0, HORUS_BLOCK_SIZE);
+          nbyte = (int) syscall (SYS_read, fd, temp_buf, HORUS_BLOCK_SIZE);
+          if (nbyte)
+          {
+            memset (iv, 0, sizeof(iv));
+            aes_xts_decrypt (cipher, block_storage, temp_buf,
+                             HORUS_BLOCK_SIZE, iv);
+            memcpy(block_storage + offset, buf + written,
+                   MIN(HORUS_BLOCK_SIZE - offset, size - written));
+          }
+          else
+            memcpy(block_storage,buf+written,MIN(HORUS_BLOCK_SIZE - offset, size - written));
+          memset (iv, 0, sizeof(iv));
+          aes_xts_encrypt (cipher, temp_buf, block_storage,
+                           HORUS_BLOCK_SIZE, iv);
+          memset (iv, 0, sizeof(iv));        
+          lseek (fd, fdpos-offset+written, SEEK_SET);
+          nbyte = syscall (SYS_write, fd, temp_buf, HORUS_BLOCK_SIZE);
+          actual_written = MIN(HORUS_BLOCK_SIZE - offset, size - written);
+        }
       }
     }
 //    printf("setting lseek to %d\n", fdpos+written);
-    lseek (fd, fdpos+actual_written, SEEK_SET);
-    nbyte=written;
+    if (aligned_write)
+    {
+      nbyte = syscall (SYS_write, fd, tbuf, size);
+    }
+    else
+    {
+      lseek (fd, fdpos+actual_written, SEEK_SET);
+      nbyte=written;
+    }
   }
 
 exit:
-  if (cipher >0)
+  if (cipher)
     free(cipher);
-exit1:
+  if (tbuf)
+    free(tbuf);
   return (ssize_t) nbyte;
 }
 
