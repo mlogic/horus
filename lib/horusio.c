@@ -3,6 +3,8 @@
 
 #include <log.h>
 #include <kds_protocol.h>
+
+#define TEST_PATH "a/home/nakul/horus"
 int
 horusio_open (const char *path, int oflag, ...)
 {
@@ -46,8 +48,8 @@ horusio_socket (int domain, int type, int protocol)
 ssize_t
 horusio_read (int fd, void *buf, size_t size)
 {
-  int nbyte,ret,block_num;
-  int i,leaf_level,config_fd;
+  int nbyte,ret,block_num,test_path_len;
+  int i,leaf_level,config_fd,do_horus = 0;
   off_t fdpos = 0,internal_offset,data_read,actual_read;
   struct stat statbuf;
   char link_path[HORUS_MAX_FILENAME_LEN];
@@ -59,6 +61,7 @@ horusio_read (int fd, void *buf, size_t size)
   char *block;
   unsigned char *p;
   
+
   u_int8_t key[32];
   u_int8_t iv[32];
   struct aes_xts_cipher *cipher;
@@ -76,17 +79,27 @@ horusio_read (int fd, void *buf, size_t size)
 /* BTIO test seems to delete old file, which breaks our system of
  * using EA. As an alternative, we request keys from a different file */
 
-//    ret = readlink(link_path, real_path, HORUS_MAX_FILENAME_LEN);
-//    assert(ret>0);
-//    real_path[ret+1] = 0;
+    ret = readlink(link_path, real_path, HORUS_MAX_FILENAME_LEN);
+    assert(ret>0);
+    real_path[ret+1] = 0;
+    test_path_len = strlen(TEST_PATH);
+    if (strncmp(TEST_PATH,real_path,test_path_len)==0)
+    {
+      do_horus = 1;
+    }
+    else
+      do_horus = 0;
+
+    memset(real_path, 0,HORUS_MAX_FILENAME_LEN);
+
     sprintf(real_path, "/home/nakul/horus/testfile");
 
     config_fd = open(real_path, O_RDONLY);
     ret = horus_get_file_config (config_fd, &c);
-    if (ret < 0 || !horus_is_valid_config (&c))
+    if (ret < 0 || !horus_is_valid_config (&c) || do_horus == 0)
       {
           nbyte = (int) syscall (SYS_read, fd, buf, size);
-          goto exit;
+          goto exit1;
       }
     close(config_fd);
     /* calculate leaf level */
@@ -98,7 +111,7 @@ horusio_read (int fd, void *buf, size_t size)
     inet_pton(AF_INET, HORUS_KDS_SERVER_ADDR, &serv_addr.sin_addr);
     serv_addr.sin_port = htons (6666);
 
-    for (data_read = 0; data_read != size; data_read += actual_read)
+    for (data_read = 0; data_read < size; data_read += actual_read)
     {
       block_num = (fdpos + data_read)/HORUS_BLOCK_SIZE;
       internal_offset = (fdpos + data_read )% HORUS_BLOCK_SIZE;
@@ -116,6 +129,8 @@ horusio_read (int fd, void *buf, size_t size)
       {
         //Just decrypt
         nbyte = (int) syscall (SYS_read, fd, temp_buf, HORUS_BLOCK_SIZE);
+        if(nbyte == 0)
+          goto exit;
         /* Use block id as IV */
         memset (iv, 0, sizeof(iv));
 //        *(unsigned long *)iv = block_num+1;
@@ -150,20 +165,20 @@ horusio_read (int fd, void *buf, size_t size)
   }
 
   p = buf;
-//  printf("read: fdpos = %u size = %u buf[0] = %u temp_buf[0] = %u nbyte = %d\n", fdpos, size, p[0], (unsigned char)temp_buf[0], nbyte);
+//  printf("read end: fdpos = %u size = %u buf[0] = %u temp_buf[0] = %u nbyte = %d\n", fdpos, size, p[0], (unsigned char)temp_buf[0], nbyte);
 
 exit:
-  if (S_ISREG (statbuf.st_mode))
-    log_read (fd, fdpos, buf, (size_t) nbyte, size);
-
+  if (cipher>0)
+    free(cipher);
+exit1:
   return (ssize_t) nbyte;
 }
 
 ssize_t
 horusio_write (int fd, const void *buf, size_t size)
 {
-  int nbyte,ret,block_num;
-  int i,leaf_level,config_fd;
+  int nbyte,ret,block_num,do_horus=0;
+  int i,leaf_level,config_fd,test_path_len;
   off_t fdpos = 0,offset,written,actual_written;
   struct stat statbuf;
   char link_path[HORUS_MAX_FILENAME_LEN];
@@ -189,20 +204,30 @@ horusio_write (int fd, const void *buf, size_t size)
   {
     fdpos = lseek (fd, 0, SEEK_CUR);
     sprintf(link_path, "/proc/self/fd/%d", fd);
+//    printf("fdpos = %d\n", fdpos);
 /* BTIO test seems to delete old file, which breaks our system of
  * using EA. As an alternative, we request keys from a different file */
 
-//    ret = readlink(link_path, real_path, HORUS_MAX_FILENAME_LEN);
-//    assert(ret>0);
-//    real_path[ret+1] = 0;
-    sprintf(real_path, "/home/nakul/horus/testfile");  
+    ret = readlink(link_path, real_path, HORUS_MAX_FILENAME_LEN);
+    assert(ret>0);
+    real_path[ret+1] = 0;
+    test_path_len = strlen(TEST_PATH);
+    if (strncmp(TEST_PATH,real_path,test_path_len)==0)
+    {
+      do_horus = 1;
+    }
+    else
+      do_horus = 0;
+    memset(real_path, 0,HORUS_MAX_FILENAME_LEN);
+    sprintf(real_path, "/home/nakul/horus/testfile");
 
     config_fd = open(real_path, O_RDONLY);
     ret = horus_get_file_config (config_fd, &c);
-    if (ret < 0 || !horus_is_valid_config (&c))
+    close(config_fd);
+    if (ret < 0 || !horus_is_valid_config (&c) || do_horus == 0)
       {
           nbyte = (int) syscall (SYS_write, fd, buf, size);
-          goto exit;
+          goto exit1;
       }
 
     /* calculate leaf level */
@@ -280,9 +305,9 @@ horusio_write (int fd, const void *buf, size_t size)
   }
 
 exit:
-  if (S_ISREG (statbuf.st_mode))
-    log_write (fd, fdpos, (void *) buf, nbyte, size);
-
+  if (cipher >0)
+    free(cipher);
+exit1:
   return (ssize_t) nbyte;
 }
 
