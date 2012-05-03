@@ -54,6 +54,8 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   /* Decide AES block size (only the first time) */
   if (aes_block_size == 0)
     {
+      if (verbose)
+        printf ("AES block size: %lu\n", aes_block_size);
       if (size > HORUS_BLOCK_SIZE)
         {
           if (size % HORUS_BLOCK_SIZE)
@@ -64,9 +66,6 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       else
         aes_block_size = size;
     }
-
-  if (verbose)
-    printf ("AES block size: %lu\n", aes_block_size);
 
   if (aes_block_size % AES_KEYSIZE_128 != 0)
     printf ("aes_block_size not aligned with %d\n", AES_KEYSIZE_128);
@@ -114,7 +113,8 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       y = block_id;
 
       /* If the horus key does not match, request */
-      if (horus_key_y != horus_key_y_of (horus_key_x, x, y,
+      if (horus_key_x < 0 ||
+          horus_key_y != horus_key_y_of (horus_key_x, x, y,
                                          horus_config.kht_block_size))
         {
           if (request_level < 0)
