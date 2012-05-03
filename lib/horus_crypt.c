@@ -54,8 +54,6 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   /* Decide AES block size (only the first time) */
   if (aes_block_size == 0)
     {
-      if (verbose)
-        printf ("AES block size: %lu\n", aes_block_size);
       if (size > HORUS_BLOCK_SIZE)
         {
           if (size % HORUS_BLOCK_SIZE)
@@ -65,6 +63,8 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
         }
       else
         aes_block_size = size;
+      if (verbose)
+        printf ("AES block size: %lu\n", aes_block_size);
     }
 
   if (aes_block_size % AES_KEYSIZE_128 != 0)
@@ -179,14 +179,45 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
 
           /* AES cryptography */
           if (op == OP_DECRYPT)
-            aes_xts_decrypt (cipher, crypt_buf, buf + ioffset,
-                             aes_block_size, iv);
+            {
+              if (verbose)
+                printf ("decrypt: buf: %p len: %lu iv: %lu\n",
+                        buf + ioffset, aes_block_size, aes_block_id);
+              if (verbose)
+                printf ("decrypt: ibuf: %p contents: %s\n",
+                        buf + ioffset, print_key (buf + ioffset, 16));
+              aes_xts_decrypt (cipher, crypt_buf, buf + ioffset,
+                               aes_block_size, iv);
+              if (verbose)
+                printf ("decrypt: obuf: %p contents: %s\n",
+                        buf + ioffset, print_key (crypt_buf, 16));
+            }
           else
-            aes_xts_encrypt (cipher, crypt_buf, buf + ioffset,
-                             aes_block_size, iv);
+            {
+              if (verbose)
+                printf ("encrypt: buf: %p len: %lu iv: %lu\n",
+                        buf + ioffset, aes_block_size, aes_block_id);
+              if (verbose)
+                printf ("encrypt: ibuf: %p contents: %s\n",
+                        buf + ioffset, print_key (buf + ioffset, 16));
+              aes_xts_encrypt (cipher, crypt_buf, buf + ioffset,
+                               aes_block_size, iv);
+              if (verbose)
+                printf ("encrypt: obuf: %p contents: %s\n",
+                        buf + ioffset, print_key (crypt_buf, 16));
+            }
 
           /* write it back */
+          if (verbose)
+            printf ("before: buf: %p contents: %s\n",
+                    buf + ioffset, print_key (buf + ioffset, 16));
+          if (verbose)
+            printf ("write back: buf: %p len: %lu iv: %lu\n",
+                    buf + ioffset, aes_block_size, aes_block_id);
           memcpy (buf + ioffset, crypt_buf, aes_block_size);
+          if (verbose)
+            printf ("after: buf: %p contents: %s\n",
+                    buf + ioffset, print_key (buf + ioffset, 16));
 
           ioffset += aes_block_size;
         }
