@@ -53,6 +53,7 @@ int horus_clear_client_range (int fd);
 int horus_delete_file_config (int fd);
 
 int horus_is_valid_config (struct horus_file_config *c);
+int horus_get_leaf_level (struct horus_file_config *c);
 
 #endif
 

@@ -51,5 +51,10 @@ horus_strerror (u_int16_t err);
 void
 client_key_request (char *key, int *key_len, char *filename, int x, int y,
                    struct sockaddr_in *serv);
+
+void
+horus_key_request (char *key, size_t *key_len, char *filename, int x, int y,
+                   int sockfd, struct sockaddr_in *serv);
+
 #endif /*_KDS_PROTOCOL_H_*/
 

@@ -15,6 +15,8 @@
 #include <unistd.h>
 #include <sys/xattr.h>
 #include <sys/types.h>
+#include <assert.h>
+
 #include <log.h>
 #include <horus_attr.h>
 
@@ -217,6 +219,17 @@ horus_is_valid_config (struct horus_file_config *c)
   if (c->kht_block_size[0] != 0)
     return 1;
   return 0;
+}
+
+int
+horus_get_leaf_level (struct horus_file_config *c)
+{
+  int i, leaf_level = 0;
+  assert (horus_is_valid_config (c));
+  for (i = 0; i < HORUS_MAX_KHT_DEPTH; i++)
+    if (c->kht_block_size[i])
+      leaf_level = i;
+  return leaf_level;
 }
 
 

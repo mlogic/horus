@@ -29,5 +29,8 @@ horus_key_by_master (char *key, size_t *key_len, int x, int y,
                      char *master, int master_len,
                      unsigned int *kht_block_size);
 
+int
+horus_key_y_of (int level, int ax, int ay, unsigned int *kht_block_size);
+
 #endif /*_HORUS_KEY_H_*/
 

@@ -306,3 +306,21 @@ horus_key_by_master (char *key, size_t *key_len, int x, int y,
   return 0;
 }
 
+int
+horus_key_y_of (int level, int ax, int ay, unsigned int *kht_block_size)
+{
+  int x, y;
+  int branch;
+
+  x = ax;
+  y = ay;
+  while (x > level)
+    {
+      branch = kht_block_size[x - 1] / kht_block_size[x];
+      x -= 1;
+      y /= branch;
+    }
+  return y;
+}
+
+
