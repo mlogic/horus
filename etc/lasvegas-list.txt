@@ -1,0 +1,16 @@
+lasvegas-4 wynn.soe.ucsc.edu
+lasvegas-5 aria.soe.ucsc.edu
+lasvegas-6 venetian.soe.ucsc.edu
+lasvegas-8 hardrock.soe.ucsc.edu
+lasvegas-9 mgmgrand.soe.ucsc.edu
+lasvegas-10 excalibur.soe.ucsc.edu
+lasvegas-11 luxor.soe.ucsc.edu
+lasvegas-12 stratosphere.soe.ucsc.edu
+lasvegas-13 mandalaybay.soe.ucsc.edu
+lasvegas-14 treasureisland.soe.ucsc.edu
+lasvegas-15 pechanga.soe.ucsc.edu
+lasvegas-16 mirage.soe.ucsc.edu
+lasvegas-17 circuscircus.soe.ucsc.edu
+lasvegas-18 palazzo.soe.ucsc.edu
+lasvegas-19 stardust.soe.ucsc.edu
+lasvegas-20 flamingo.soe.ucsc.edu
