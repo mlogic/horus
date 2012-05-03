@@ -36,8 +36,9 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   unsigned long long prev_horus_align, next_horus_align;
   unsigned long long ioffset = 0;
   unsigned long sblock, eblock, block_id;
-  int ret, verbose = 0;
+  int ret, verbose = 0, debug = 0;
   unsigned long x, y;
+  int horus = 0, aescrypt = 0;
 
   char block_key[HORUS_KEY_LEN];
   size_t block_key_len;
@@ -48,11 +49,17 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   u_int8_t iv[AES_KEYSIZE_128 * 2];
   char crypt_buf[HORUS_BLOCK_SIZE];
 
+  if (getenv ("ENABLE_AES"))
+    aescrypt++;
+  if (getenv ("ENABLE_HORUS"))
+    horus++;
   if (getenv ("HORUS_VERBOSE"))
     verbose++;
+  if (getenv ("HORUS_DEBUG"))
+    debug++;
 
   /* Decide AES block size (only the first time) */
-  if (aes_block_size == 0)
+  if (aescrypt && aes_block_size == 0)
     {
       if (size > HORUS_BLOCK_SIZE)
         {
@@ -63,19 +70,20 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
         }
       else
         aes_block_size = size;
+
       if (verbose)
         printf ("AES block size: %lu\n", aes_block_size);
+
+      if (aes_block_size % AES_KEYSIZE_128 != 0)
+        printf ("aes_block_size not aligned with %d\n", AES_KEYSIZE_128);
+      if (offset % aes_block_size != 0)
+        printf ("offset not aligned with %lu\n", aes_block_size);
+      if (size % aes_block_size != 0)
+        printf ("size not aligned with %lu\n", aes_block_size);
     }
 
-  if (aes_block_size % AES_KEYSIZE_128 != 0)
-    printf ("aes_block_size not aligned with %d\n", AES_KEYSIZE_128);
-  if (offset % aes_block_size != 0)
-    printf ("offset not aligned with %lu\n", aes_block_size);
-  if (size % aes_block_size != 0)
-    printf ("size not aligned with %lu\n", aes_block_size);
-
   /* Horus file config (only the first time) */
-  if (leaf_level < 0)
+  if (horus && leaf_level < 0)
     {
       int fd;
 
@@ -96,11 +104,11 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       horus_kds_addr.sin_family = AF_INET;
       inet_pton (AF_INET, fixed_kds_addr, &horus_kds_addr.sin_addr);
       horus_kds_addr.sin_port = htons (HORUS_KDS_SERVER_PORT);
-
-      cipher = aes_xts_init ();
     }
 
   /* AES */
+  if (aescrypt && cipher == NULL)
+    cipher = aes_xts_init ();
   memset (aeskey, 0, sizeof (aeskey));
   memset (iv, 0, sizeof (iv));
 
@@ -112,49 +120,56 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
     {
       y = block_id;
 
-      /* If the horus key does not match, request */
-      if (horus_key_x < 0 ||
-          horus_key_y != horus_key_y_of (horus_key_x, x, y,
-                                         horus_config.kht_block_size))
+      if (horus)
         {
-          if (request_level < 0)
-            request_level = leaf_level;
-          horus_key_x = request_level;
-          horus_key_y = horus_key_y_of (request_level, x, y,
-                                        horus_config.kht_block_size);
-          horus_key_len = sizeof (horus_key);
-          horus_key_request (horus_key, &horus_key_len,
-                             dummy_path, horus_key_x, horus_key_y,
-                             horus_sockfd, &horus_kds_addr);
-
-          if (verbose)
-            printf ("request K_%d,%d = %s\n", horus_key_x, horus_key_y,
-                    print_key (horus_key, horus_key_len));
+          /* If the horus key does not match, request */
+          if (horus_key_x < 0 ||
+              horus_key_y != horus_key_y_of (horus_key_x, x, y,
+                                             horus_config.kht_block_size))
+            {
+              if (request_level < 0)
+                request_level = leaf_level;
+              horus_key_x = request_level;
+              horus_key_y = horus_key_y_of (request_level, x, y,
+                                            horus_config.kht_block_size);
+              horus_key_len = sizeof (horus_key);
+              horus_key_request (horus_key, &horus_key_len,
+                                 dummy_path, horus_key_x, horus_key_y,
+                                 horus_sockfd, &horus_kds_addr);
+    
+              if (verbose)
+                printf ("request K_%d,%d = %s\n", horus_key_x, horus_key_y,
+                        print_key (horus_key, horus_key_len));
+            }
+    
+          /* Calculate the leaf key */
+          if (horus_key_x != x)
+            {
+              block_key_len = sizeof (block_key);
+              horus_block_key (block_key, &block_key_len, x, y,
+                               horus_key, horus_key_len,
+                               horus_key_x, horus_key_y,
+                               horus_config.kht_block_size);
+              if (verbose)
+                printf ("calculated K_%lu,%lu = %s\n", x, y,
+                        print_key (block_key, block_key_len));
+            }
+          else
+            {
+              assert (horus_key_y == y);
+              memcpy (block_key, horus_key, HORUS_KEY_LEN);
+              block_key_len = horus_key_len;
+            }
         }
 
-      /* Calculate the leaf key */
-      if (horus_key_x != x)
+      if (aescrypt)
         {
-          block_key_len = sizeof (block_key);
-          horus_block_key (block_key, &block_key_len, x, y,
-                           horus_key, horus_key_len, horus_key_x, horus_key_y,
-                           horus_config.kht_block_size);
-          if (verbose)
-            printf ("calculated K_%lu,%lu = %s\n", x, y,
-                    print_key (block_key, block_key_len));
+          /* Set AES key */
+          memset (aeskey, 0, AES_KEYSIZE_128 * 2);
+          memcpy (aeskey, block_key, block_key_len);
+          ret = aes_xts_setkey (cipher, aeskey, AES_KEYSIZE_128 * 2);
+          assert (! ret);
         }
-      else
-        {
-          assert (horus_key_y == y);
-          memcpy (block_key, horus_key, HORUS_KEY_LEN);
-          block_key_len = horus_key_len;
-        }
-
-      /* Set AES key */
-      memset (aeskey, 0, AES_KEYSIZE_128 * 2);
-      memcpy (aeskey, block_key, block_key_len);
-      ret = aes_xts_setkey (cipher, aeskey, AES_KEYSIZE_128 * 2);
-      assert (! ret);
 
       /* Calculate AES block */
       prev_horus_align = ((offset + ioffset) / HORUS_BLOCK_SIZE) *
@@ -170,8 +185,9 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
            aes_block_id++)
         {
           if (verbose)
-            printf ("aes_block[%lu]: pos: %#llx\n",
-                    aes_block_id, offset + ioffset);
+            printf ("offset: %llu aes[%lu]: ioffset: %llu buf: %s\n",
+                    offset, aes_block_id, ioffset,
+                    print_key (buf + ioffset, 16));
 
           /* Set AES IV */
           memset (iv, 0, sizeof (iv));
@@ -180,44 +196,39 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
           /* AES cryptography */
           if (op == OP_DECRYPT)
             {
-              if (verbose)
-                printf ("decrypt: buf: %p len: %lu iv: %lu\n",
-                        buf + ioffset, aes_block_size, aes_block_id);
-              if (verbose)
-                printf ("decrypt: ibuf: %p contents: %s\n",
-                        buf + ioffset, print_key (buf + ioffset, 16));
-              aes_xts_decrypt (cipher, crypt_buf, buf + ioffset,
-                               aes_block_size, iv);
-              if (verbose)
-                printf ("decrypt: obuf: %p contents: %s\n",
-                        buf + ioffset, print_key (crypt_buf, 16));
+              if (aescrypt && debug)
+                printf ("offset: %llu aes[%lu]: ioffset: %llu op: decrypt\n",
+                        offset, aes_block_id, ioffset);
+              if (aescrypt)
+                aes_xts_decrypt (cipher, crypt_buf, buf + ioffset,
+                                 aes_block_size, iv);
+              else
+                memcpy (crypt_buf, buf + ioffset, aes_block_size);
             }
           else
             {
-              if (verbose)
-                printf ("encrypt: buf: %p len: %lu iv: %lu\n",
-                        buf + ioffset, aes_block_size, aes_block_id);
-              if (verbose)
-                printf ("encrypt: ibuf: %p contents: %s\n",
-                        buf + ioffset, print_key (buf + ioffset, 16));
-              aes_xts_encrypt (cipher, crypt_buf, buf + ioffset,
-                               aes_block_size, iv);
-              if (verbose)
-                printf ("encrypt: obuf: %p contents: %s\n",
-                        buf + ioffset, print_key (crypt_buf, 16));
+              if (aescrypt && debug)
+                printf ("offset: %llu aes[%lu]: ioffset: %llu op: encrypt\n",
+                        offset, aes_block_id, ioffset);
+              if (aescrypt)
+                aes_xts_encrypt (cipher, crypt_buf, buf + ioffset,
+                                 aes_block_size, iv);
+              else
+                memcpy (crypt_buf, buf + ioffset, aes_block_size);
             }
 
+          if (debug)
+            printf ("offset: %llu aes[%lu]: ioffset: %llu crypt: %s\n",
+                    offset, aes_block_id, ioffset,
+                    print_key (crypt_buf, 16));
+
           /* write it back */
-          if (verbose)
-            printf ("before: buf: %p contents: %s\n",
-                    buf + ioffset, print_key (buf + ioffset, 16));
-          if (verbose)
-            printf ("write back: buf: %p len: %lu iv: %lu\n",
-                    buf + ioffset, aes_block_size, aes_block_id);
           memcpy (buf + ioffset, crypt_buf, aes_block_size);
-          if (verbose)
-            printf ("after: buf: %p contents: %s\n",
-                    buf + ioffset, print_key (buf + ioffset, 16));
+
+          if (debug)
+            printf ("offset: %llu aes[%lu]: ioffset: %llu writeback: %s\n",
+                    offset, aes_block_id, ioffset,
+                    print_key (buf + ioffset, 16));
 
           ioffset += aes_block_size;
         }
