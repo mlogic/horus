@@ -38,7 +38,7 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   unsigned long sblock, eblock, block_id;
   int ret, verbose = 0, debug = 0;
   unsigned long x, y;
-  int horus = 0, aescrypt = 0;
+  int horus = 0, aescrypt = 0, nowriteback = 0;
   char *addr, *filename;
 
   char block_key[HORUS_KEY_LEN];
@@ -54,6 +54,8 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
     verbose++;
   if (getenv ("HORUS_DEBUG"))
     debug++;
+  if (getenv ("DISABLE_WRITEBACK"))
+    nowriteback++;
 
   if (getenv ("ENABLE_AES"))
     aescrypt++;
@@ -70,7 +72,7 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
     file_path = filename;
 
   /* Decide AES block size (only the first time) */
-  if (aescrypt && aes_block_size == 0)
+  if (aes_block_size == 0)
     {
       if (size > HORUS_BLOCK_SIZE)
         {
@@ -177,7 +179,8 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
         {
           /* Set AES key */
           memset (aeskey, 0, AES_KEYSIZE_128 * 2);
-          memcpy (aeskey, block_key, block_key_len);
+          if (horus)
+            memcpy (aeskey, block_key, block_key_len);
           ret = aes_xts_setkey (cipher, aeskey, AES_KEYSIZE_128 * 2);
           assert (! ret);
         }
@@ -233,8 +236,11 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
                     offset, aes_block_id, ioffset,
                     print_key (crypt_buf, 16));
 
-          /* write it back */
-          memcpy (buf + ioffset, crypt_buf, aes_block_size);
+          if (! nowriteback)
+            {
+              /* write it back */
+              memcpy (buf + ioffset, crypt_buf, aes_block_size);
+            }
 
           if (debug)
             printf ("offset: %llu aes[%lu]: ioffset: %llu writeback: %s\n",
