@@ -8,7 +8,7 @@
 #include <xts.h>
 
 char *kds_serv_addr = "128.114.52.64";
-char *file_path = "/scratch/nakul/testfile";
+char *file_path = "/scratch/horus/horus-data-file";
 int request_level = -1;
 
 /* Horus configuration */
