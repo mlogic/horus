@@ -7,9 +7,9 @@
 #include <aes.h>
 #include <xts.h>
 
-char *fixed_kds_addr = "128.114.52.64";
-char *dummy_path = "/scratch/nakul/testfile";
-int request_level = 0;
+char *kds_serv_addr = "128.114.52.64";
+char *file_path = "/scratch/nakul/testfile";
+int request_level = -1;
 
 /* Horus configuration */
 int leaf_level = -1;
@@ -39,6 +39,7 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   int ret, verbose = 0, debug = 0;
   unsigned long x, y;
   int horus = 0, aescrypt = 0;
+  char *addr, *filename;
 
   char block_key[HORUS_KEY_LEN];
   size_t block_key_len;
@@ -49,14 +50,24 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   u_int8_t iv[AES_KEYSIZE_128 * 2];
   char crypt_buf[HORUS_BLOCK_SIZE];
 
-  if (getenv ("ENABLE_AES"))
-    aescrypt++;
-  if (getenv ("ENABLE_HORUS"))
-    horus++;
   if (getenv ("HORUS_VERBOSE"))
     verbose++;
   if (getenv ("HORUS_DEBUG"))
     debug++;
+
+  if (getenv ("ENABLE_AES"))
+    aescrypt++;
+  if (getenv ("ENABLE_HORUS"))
+    horus++;
+  if (getenv ("ENABLE_AGGREGATE"))
+    request_level = 0;
+
+  addr = getenv ("HORUS_KDS_SERVER");
+  if (addr)
+    kds_serv_addr = addr;
+  filename = getenv ("HORUS_FILENAME");
+  if (filename)
+    file_path = filename;
 
   /* Decide AES block size (only the first time) */
   if (aescrypt && aes_block_size == 0)
@@ -88,10 +99,10 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       int fd;
 
       if (verbose)
-        printf ("Horus for %s\n", dummy_path);
+        printf ("Horus for %s\n", file_path);
 
       /* Get Horus config */
-      fd = open (dummy_path, O_RDONLY);
+      fd = open (file_path, O_RDONLY);
       ret = horus_get_file_config (fd, &horus_config);
       assert (ret >= 0 && horus_is_valid_config (&horus_config));
       close (fd);
@@ -102,7 +113,7 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       assert (horus_sockfd > 0);
       memset (&horus_kds_addr, 0, sizeof (horus_kds_addr));
       horus_kds_addr.sin_family = AF_INET;
-      inet_pton (AF_INET, fixed_kds_addr, &horus_kds_addr.sin_addr);
+      inet_pton (AF_INET, kds_serv_addr, &horus_kds_addr.sin_addr);
       horus_kds_addr.sin_port = htons (HORUS_KDS_SERVER_PORT);
     }
 
@@ -134,7 +145,7 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
                                             horus_config.kht_block_size);
               horus_key_len = sizeof (horus_key);
               horus_key_request (horus_key, &horus_key_len,
-                                 dummy_path, horus_key_x, horus_key_y,
+                                 file_path, horus_key_x, horus_key_y,
                                  horus_sockfd, &horus_kds_addr);
     
               if (verbose)
