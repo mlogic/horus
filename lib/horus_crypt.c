@@ -126,6 +126,10 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
           horus_key_request (horus_key, &horus_key_len,
                              dummy_path, horus_key_x, horus_key_y,
                              horus_sockfd, &horus_kds_addr);
+
+          if (verbose)
+            printf ("request K_%d,%d = %s\n", horus_key_x, horus_key_y,
+                    print_key (horus_key, horus_key_len));
         }
 
       /* Calculate the leaf key */
@@ -135,6 +139,9 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
           horus_block_key (block_key, &block_key_len, x, y,
                            horus_key, horus_key_len, horus_key_x, horus_key_y,
                            horus_config.kht_block_size);
+          if (verbose)
+            printf ("calculated K_%lu,%lu = %s\n", x, y,
+                    print_key (block_key, block_key_len));
         }
       else
         {
@@ -155,10 +162,17 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       next_horus_align = prev_horus_align + HORUS_BLOCK_SIZE;
       aes_sblock = (offset + ioffset) / aes_block_size;
       aes_eblock = MIN (offset + size, next_horus_align) / aes_block_size;
+      if (verbose)
+        printf ("aes_block: start: %lu end: %lu (pos %#llx)\n",
+                aes_sblock, aes_eblock, offset + ioffset);
 
       for (aes_block_id = aes_sblock; aes_block_id < aes_eblock;
            aes_block_id++)
         {
+          if (verbose)
+            printf ("aes_block[%lu]: pos: %#llx\n",
+                    aes_block_id, offset + ioffset);
+
           /* Set AES IV */
           memset (iv, 0, sizeof (iv));
           *(unsigned long long *)iv = aes_block_id;
