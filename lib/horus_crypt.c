@@ -38,8 +38,8 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   unsigned long sblock, eblock, block_id;
   int ret, verbose = 0, debug = 0;
   unsigned long x, y;
-  int horus = 0, aescrypt = 0, nowriteback = 0;
-  char *addr, *filename;
+  int horus = 0, aescrypt = 0, nowriteback = 0, aggregate = 0, spinwait = 0;
+  char *addr, *filename, *hostname;
 
   char block_key[HORUS_KEY_LEN];
   size_t block_key_len;
@@ -62,7 +62,11 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   if (getenv ("ENABLE_HORUS"))
     horus++;
   if (getenv ("ENABLE_AGGREGATE"))
-    request_level = 0;
+    aggregate++;
+  if (getenv ("ENABLE_SPINWAIT"))
+    spinwait++;
+
+  hostname = getenv ("HOSTNAME");
 
   addr = getenv ("HORUS_KDS_SERVER");
   if (addr)
@@ -71,8 +75,28 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   if (filename)
     file_path = filename;
 
+  if (! getenv ("DISABLE_CONFIGPRINT"))
+    printf ("Horus BTIO: %s%s%s%s%s%s%s%s%s%s%s\n",
+          (verbose ?     " verbose" : ""),
+          (debug ?       " debug" : ""),
+          (nowriteback ? " nowriteback" : ""),
+          (aescrypt ?    " aes" : ""),
+          (horus ?       " horus" : ""),
+          (aggregate ?   " aggregate" : ""),
+          (spinwait ?    " spinwait" : ""),
+          (addr ?        " serv: " : ""),
+          (addr ?          addr : ""),
+          (filename ?    " file: " : ""),
+          (filename ?      filename : ""));
+
   if (horus == 0 && aescrypt == 0)
     return;
+
+  if (aggregate)
+    request_level = 0;
+
+  if (debug)
+    horus_verbose++;
 
   /* Decide AES block size (only the first time) */
   if (aes_block_size == 0)
@@ -115,6 +139,8 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
 
       /* Setup connection with KDS */
       horus_sockfd = socket (PF_INET, SOCK_DGRAM, 0);
+      if (spinwait)
+        fcntl (horus_sockfd, F_SETFL, O_NONBLOCK);
       assert (horus_sockfd > 0);
       memset (&horus_kds_addr, 0, sizeof (horus_kds_addr));
       horus_kds_addr.sin_family = AF_INET;
@@ -149,15 +175,20 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
               horus_key_y = horus_key_y_of (request_level, x, y,
                                             horus_config.kht_block_size);
               horus_key_len = sizeof (horus_key);
-              horus_key_request (horus_key, &horus_key_len,
-                                 file_path, horus_key_x, horus_key_y,
-                                 horus_sockfd, &horus_kds_addr);
-    
+              if (spinwait)
+                horus_key_request_spin (horus_key, &horus_key_len,
+                                        file_path, horus_key_x, horus_key_y,
+                                        horus_sockfd, &horus_kds_addr);
+              else
+                horus_key_request (horus_key, &horus_key_len,
+                                   file_path, horus_key_x, horus_key_y,
+                                   horus_sockfd, &horus_kds_addr);
+
               if (verbose)
                 printf ("request K_%d,%d = %s\n", horus_key_x, horus_key_y,
                         print_key (horus_key, horus_key_len));
             }
-    
+
           /* Calculate the leaf key */
           if (horus_key_x != x)
             {
@@ -197,6 +228,16 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       if (verbose)
         printf ("aes_block: start: %lu end: %lu (pos %#llx)\n",
                 aes_sblock, aes_eblock, offset + ioffset);
+      if (debug && aes_sblock == aes_eblock)
+        {
+          printf ("prev_horus_align = %llu\n", prev_horus_align);
+          printf ("next_horus_align = %llu\n", next_horus_align);
+          printf ("offset: %llu, ioffset: %llu, aes_block_size: %lu",
+                  offset, ioffset, aes_block_size);
+          printf ("MIN(offset+size,next_horus_align): %llu",
+                  MIN (offset+size, next_horus_align));
+        }
+      //assert (aes_sblock < aes_eblock);
 
       for (aes_block_id = aes_sblock; aes_block_id < aes_eblock;
            aes_block_id++)
