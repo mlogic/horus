@@ -48,7 +48,7 @@
 #undef PARENT_KEY_STRING_CONVERSION
 #undef STRING_MESSAGE
 
-#define HORUS_BLOCK_SIZE 4096
+#define HORUS_BLOCK_SIZE 1048576
 #define HORUS_KEY_LEN    (160/8)
 
 #include <minmax.h>

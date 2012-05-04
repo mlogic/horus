@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(top_srcdir)/aes  -I$(top_srcdir)/lib @OPENSSL_INCLUDES@
+AM_CPPFLAGS = -I$(top_srcdir)/aes  -I$(top_srcdir)/lib @OPENSSL_INCLUDES@ @PTHREAD_LIBS@
 
 AM_LDFLAGS = ../aes/libaes.la
 lib_LTLIBRARIES = libhorus.la

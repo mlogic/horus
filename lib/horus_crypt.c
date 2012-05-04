@@ -3,6 +3,7 @@
 #include <horus_key.h>
 #include <kds_protocol.h>
 #include <log.h>
+#include <pthread.h>
 
 #include <aes.h>
 #include <xts.h>
@@ -16,6 +17,8 @@ int leaf_level = -1;
 int horus_sockfd = -1;
 struct horus_file_config horus_config;
 struct sockaddr_in horus_kds_addr;
+pthread_mutex_t fd_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 /* Horus key cache */
 char horus_key[HORUS_KEY_LEN];
@@ -138,7 +141,9 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       leaf_level = horus_get_leaf_level (&horus_config);
 
       /* Setup connection with KDS */
+      pthread_mutex_lock(&fd_mutex);
       horus_sockfd = socket (PF_INET, SOCK_DGRAM, 0);
+      pthread_mutex_unlock(&fd_mutex);
       if (spinwait)
         fcntl (horus_sockfd, F_SETFL, O_NONBLOCK);
       assert (horus_sockfd > 0);
