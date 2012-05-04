@@ -163,9 +163,9 @@ horus_key_request_spin (char *key, size_t *key_len, char *filename,
                           (struct sockaddr *) &addr, &addrlen);
           //read_count--;
           //assert (ret == sizeof (struct key_response_packet));
-          if (ret != sizeof (struct key_request_packet))
+          if (ret != sizeof (struct key_response_packet))
             continue;
-    
+
           resx = ntohl (res.x);
           resy = ntohl (res.y);
           if (x != resx || y != resy)
