@@ -71,6 +71,9 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   if (filename)
     file_path = filename;
 
+  if (horus == 0 && aescrypt == 0)
+    return;
+
   /* Decide AES block size (only the first time) */
   if (aes_block_size == 0)
     {
