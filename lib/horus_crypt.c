@@ -42,7 +42,7 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   int ret, verbose = 0, debug = 0;
   unsigned long x, y;
   int horus = 0, aescrypt = 0, nowriteback = 0, aggregate = 0, spinwait = 0;
-  char *addr, *filename, *hostname;
+  char *addr, *filename, *hostname, *level;
 
   char block_key[HORUS_KEY_LEN];
   size_t block_key_len;
@@ -68,6 +68,9 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
     aggregate++;
   if (getenv ("ENABLE_SPINWAIT"))
     spinwait++;
+  level = getenv ("REQUEST_LEVEL");
+  if (level)
+    request_level = atoi(level);
 
   hostname = getenv ("HOSTNAME");
 
