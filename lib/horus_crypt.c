@@ -73,7 +73,7 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   if (filename)
     file_path = filename;
 
-  printf ("Horus: %s%s%s%s%s%s%s%s%s%s%s\n",
+  printf ("Horus BTIO: %s%s%s%s%s%s%s%s%s%s%s\n",
           (verbose ?     " verbose" : ""),
           (debug ?       " debug" : ""),
           (nowriteback ? " nowriteback" : ""),
