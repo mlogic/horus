@@ -173,7 +173,7 @@ horus_key_request_spin (char *key, size_t *key_len, char *filename,
           if (x != resx || y != resy)
             {
               printf ("wrong key: K_%d,%d\n", resx, resy);
-              exit (1);
+              //exit (1);
             }
           if (horus_verbose)
             printf ("received key: K_%d,%d\n", resx, resy);
