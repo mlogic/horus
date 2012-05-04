@@ -150,19 +150,19 @@ horus_key_request_spin (char *key, size_t *key_len, char *filename,
   snprintf (req.filename, sizeof (req.filename), "%s", filename);
 
   do {
+      if (horus_verbose)
+        printf ("request key: K_%d,%d\n", x, y);
       ret = sendto (sockfd, &req, sizeof (struct key_request_packet), 0,
                     (struct sockaddr *) serv, sizeof (struct sockaddr_in));
       assert (ret == sizeof (struct key_request_packet));
-      if (horus_verbose)
-        printf ("requested key: K_%d,%d\n", x, y);
-      send_count--;
+      //send_count--;
 
       do {
           usleep (1);
           ret = recvfrom (sockfd, &res, sizeof (struct key_response_packet),  0,
                           (struct sockaddr *) &addr, &addrlen);
           assert (ret == sizeof (struct key_response_packet));
-          read_count--;
+          //read_count--;
     
           resx = ntohl (res.x);
           resy = ntohl (res.y);

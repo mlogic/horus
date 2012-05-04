@@ -39,7 +39,7 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   int ret, verbose = 0, debug = 0;
   unsigned long x, y;
   int horus = 0, aescrypt = 0, nowriteback = 0, aggregate = 0, spinwait = 0;
-  char *addr, *filename;
+  char *addr, *filename, *hostname;
 
   char block_key[HORUS_KEY_LEN];
   size_t block_key_len;
@@ -65,6 +65,8 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
     aggregate++;
   if (getenv ("ENABLE_SPINWAIT"))
     spinwait++;
+
+  hostname = getenv ("HOSTNAME");
 
   addr = getenv ("HORUS_KDS_SERVER");
   if (addr)
@@ -222,6 +224,16 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
       if (verbose)
         printf ("aes_block: start: %lu end: %lu (pos %#llx)\n",
                 aes_sblock, aes_eblock, offset + ioffset);
+      if (debug && aes_sblock == aes_eblock)
+        {
+          printf ("prev_horus_align = %llu\n", prev_horus_align);
+          printf ("next_horus_align = %llu\n", next_horus_align);
+          printf ("offset: %llu, ioffset: %llu, aes_block_size: %lu",
+                  offset, ioffset, aes_block_size);
+          printf ("MIN(offset+size,next_horus_align): %llu",
+                  MIN (offset+size, next_horus_align));
+        }
+      //assert (aes_sblock < aes_eblock);
 
       for (aes_block_id = aes_sblock; aes_block_id < aes_eblock;
            aes_block_id++)
