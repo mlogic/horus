@@ -141,7 +141,7 @@ horus_key_request_spin (char *key, size_t *key_len, char *filename,
   socklen_t addrlen = sizeof (struct sockaddr_in);
   int resx, resy, reskeylen;
   int reserr, ressuberr;
-  int read_count = 5, send_count = 3;
+  int read_count, send_count;
   int success = 0;
 
   memset (&req, 0, sizeof (req));
@@ -149,6 +149,7 @@ horus_key_request_spin (char *key, size_t *key_len, char *filename,
   req.y = htonl (y);
   snprintf (req.filename, sizeof (req.filename), "%s", filename);
 
+  send_count = 3;
   do {
       if (horus_verbose)
         printf ("request key: K_%d,%d\n", x, y);
@@ -157,11 +158,12 @@ horus_key_request_spin (char *key, size_t *key_len, char *filename,
       //send_count--;
       assert (ret == sizeof (struct key_request_packet));
 
+      read_count = 5;
       do {
           usleep (1);
           ret = recvfrom (sockfd, &res, sizeof (struct key_response_packet),  0,
                           (struct sockaddr *) &addr, &addrlen);
-          //read_count--;
+          read_count--;
           //assert (ret == sizeof (struct key_response_packet));
           if (ret != sizeof (struct key_response_packet))
             continue;
