@@ -5,7 +5,6 @@
 #include <kds_protocol.h>
 #include <assert.h>
 #include <getopt.h>
-#include <benchmark.h>
 
 #define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
 char *progname;

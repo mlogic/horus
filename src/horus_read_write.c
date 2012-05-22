@@ -5,7 +5,6 @@
 #include <getopt.h>
 #include <horus_attr.h>
 #include <horus_stats.h>
-#include <benchmark.h>
 
 #include "timeval.h"
 #include "minmax.h"

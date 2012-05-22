@@ -65,7 +65,8 @@ AM_PROG_CC_C_O
 AM_PROG_AS
 
 # Checks for libraries.
-PKG_CHECK_MODULES([CHECK], [check >= 0.9.8])
+PKG_CHECK_MODULES([CHECK], [check >= 0.9.8],[libcheck=true])
+AM_CONDITIONAL([LIBCHECK], [test x$libcheck = xtrue])
 
 # Checks for header files.
 AC_HEADER_STDC
