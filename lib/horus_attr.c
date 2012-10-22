@@ -170,8 +170,10 @@ horus_get_client_range (struct horus_file_config *c, struct in_addr *addr,
   for (i = 0; i < HORUS_MAX_CLIENT_ENTRY; i++)
     {
       p = &c->client_range[i];
-      if (! IS_HORUS_CLIENT_RANGE_EMPTY (p) &&
-          p->prefix.s_addr == addr->s_addr)
+      if ( ! IS_HORUS_CLIENT_RANGE_EMPTY (p) &&
+           ( p->prefixlen == 0 ||
+             p->prefix.s_addr >> (32 - p->prefixlen) ==
+             addr->s_addr >> (32 - p->prefixlen) ) )
         {
           match = p;
           break;
@@ -184,7 +186,7 @@ horus_get_client_range (struct horus_file_config *c, struct in_addr *addr,
       return 0;
     }
   else
-    return ENOENT;
+    return -ENOENT;
 }
 
 int
