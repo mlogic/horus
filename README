@@ -1,13 +1,20 @@
-Pre-requirement for Linux:
-  Fedora: gcc, check-devel
+This is Horus, the scalable encryption-based security system for
+large-scale storage.
 
-Compile:
-  % (optional) 'autoreconf' or 'sh -x autogen.sh'
+SYSTEM REQUIREMENTS
+  Horus has been developed and tested on Fedora 14 x86-64. It doesn't
+  require any Fedora-specific features and should work on any modern
+  Linux distributions, perhaps with some little tweaks.
+
+  Required packages: gcc, check-devel, openssl
+
+QUICK START
+  1. Build the package:
   % ./configure
   % make
   % make install
 
-Setup:
+SETUP
   1. add syslog.conf a line about local7 facility.
      local7.*                       /var/log/local7.log
 
@@ -17,7 +24,7 @@ Setup:
   3. (optional) add configuration in newsyslog.conf.
      % sudo cp $(srcdir)/misc/horus-newsyslog.conf /etc/newsyslog.d/
 
-Usage:
+USAGE
   Using file setting tools:
       % ~/bin/horus-file FILENAME master-key 'horus master key'
 
@@ -36,7 +43,7 @@ Usage:
 
       % ~/bin/horus-file FILENAME delete
 
-  Using key calculation tools:
+  Using the key calculation tools:
 
       % python etc/python.py <offset> <masterkey>
 
@@ -44,7 +51,19 @@ Usage:
 
       % ~/bin/horus-key FILENAME -x 3 -y 3
 
-  Starting server:
+  Starting the Key Distribution Server (KDS):
+      % ~/sbin/kds_server
 
-  Using library:
-
+  Using the library:
+    The Horus library is controlled by the following environment variables:
+      DISABLE_CONFIGPRINT
+      DISABLE_WRITEBACK
+      ENABLE_AES
+      ENABLE_AGGREGATE
+      ENABLE_HORUS
+      ENABLE_SPINWAIT
+      HORUS_DEBUG
+      HORUS_KDS_SERVER
+      HORUS_VERBOSE
+      REQUEST_LEVEL
+      HORUS_FILENAME
