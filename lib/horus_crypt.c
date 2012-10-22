@@ -8,8 +8,8 @@
 #include <aes.h>
 #include <xts.h>
 
-char *kds_serv_addr = "128.114.52.64";
-char *file_path = "/scratch/horus/horus-data-file";
+char *kds_serv_addr = NULL;
+char *file_path = NULL;
 int request_level = -1;
 
 /* Horus configuration */
@@ -77,9 +77,20 @@ horus_crypt (char *buf, ssize_t size, unsigned long long offset, int op)
   addr = getenv ("HORUS_KDS_SERVER");
   if (addr)
     kds_serv_addr = addr;
+  else
+    {
+      printf ("env HORUS_KDS_SERVER not set.\n");
+      exit (2);
+    }
+
   filename = getenv ("HORUS_FILENAME");
   if (filename)
     file_path = filename;
+  else
+    {
+      printf ("env HORUS_FILENAME not set.\n");
+      exit (2);
+    }
 
   if (! getenv ("DISABLE_CONFIGPRINT"))
     printf ("Horus BTIO: %s%s%s%s%s%s%s%s%s%s%s\n",
