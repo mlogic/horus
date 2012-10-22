@@ -149,7 +149,8 @@ kds_get_client_key (int id, struct in_addr *client,
   if (! (sblock <= start && end <= eblock))
     {
       if (horus_verbose)
-        printf ("thread[%d]: client not allowed\n", id);
+        printf ("thread[%d]: client not allowed. Permitted range: %u - %u, "
+            "requested range: %u - %u\n", id, sblock, eblock, start, end);
       kresp->err = htons (HORUS_ERR_REQ_NOT_ALLOWED);
       kresp->suberr = htons (EINVAL);
       return 0;
