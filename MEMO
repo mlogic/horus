@@ -1,2 +1,0 @@
-- the method for debugging: sh ./libtool --mode=execute gdb horus-file
-
