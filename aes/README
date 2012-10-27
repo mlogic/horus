@@ -1,4 +1,1 @@
 AES-XTS mode ported from Linux kernel 3.2.3.
-
-WARNING: currently it builds on 32-bit system only because the bits
-per long is hardcoded in bitsperlong.h. Fix me!

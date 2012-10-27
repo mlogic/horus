@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2012, University of California, Santa Cruz, CA, USA.
  * Developers:
- *  Yan Li <yanli@ucsc.edu>
+ *  Yan Li <yanli@cs.ucsc.edu>
  *
  * Based on Linux kernel 3.2.3:
  * gf128mul.h - GF(2^128) multiplication functions
