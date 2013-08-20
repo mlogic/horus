@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT(horus, 0.0.2, horus@soe.ucsc.edu)
+AC_INIT(horus, 0.0.3, horus@soe.ucsc.edu)
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([lib/horus.c])
 AC_CONFIG_HEADER([config.h])
