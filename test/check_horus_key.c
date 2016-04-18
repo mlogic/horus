@@ -2,7 +2,7 @@
  * Test Cases for Horus Key Utils
  *
  * Developers:
- *  Yan Li <yanli@cs.ucsc.edu>
+ *  Yan Li <yanli@ascar.io>
  *
  * Copyright (c) 2012, The Regents of the University of California
  * All rights reserved.

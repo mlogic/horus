@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2012, University of California, Santa Cruz, CA, USA.
  * Developers:
- *  Yan Li <yanli@cs.ucsc.edu>
+ *  Yan Li <yanli@ascar.io>
  *
  * XTS: as defined in IEEE1619/D16
  *      http://grouper.ieee.org/groups/1619/email/pdf00086.pdf

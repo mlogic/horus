@@ -4,7 +4,7 @@
  * Copyright (c) 2012, University of California, Santa Cruz, CA, USA.
  * Developers:
  *  Nakul Dhotre <nakul@soe.ucsc.edu>
- *  Yan Li <yanli@cs.ucsc.edu>
+ *  Yan Li <yanli@ascar.io>
  *  Yasuhiro Ohara <yasu@soe.ucsc.edu>
  *
  * Redistribution and use in source and binary forms, with or without

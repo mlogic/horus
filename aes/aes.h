@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2012, University of California, Santa Cruz, CA, USA.
  * Developers:
- *  Yan Li <yanli@cs.ucsc.edu>
+ *  Yan Li <yanli@ascar.io>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as 

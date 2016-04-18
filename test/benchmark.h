@@ -3,7 +3,7 @@
  *
  * Developers:
  *  Nakul Dhotre <nakul@soe.ucsc.edu>
- *  Yan Li <yanli@cs.ucsc.edu>
+ *  Yan Li <yanli@ascar.io>
  *
  * Copyright (c) 2012, The Regents of the University of California
  * All rights reserved.

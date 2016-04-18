@@ -1,5 +1,10 @@
 This is Horus, the scalable encryption-based security system for
-large-scale storage.
+large-scale storage. The latest project information can be found at
+http://www.ssrc.ucsc.edu/horus.html , where you can find our FAST'13
+paper that describes the Horus algorithm and system in detail.
+
+MAINTAINER
+  This project is being maintained by Yan Li <yanli@ascar.io>
 
 SYSTEM REQUIREMENTS
   Horus has been developed and tested on Fedora 14 x86-64. It doesn't

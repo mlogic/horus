@@ -1,7 +1,6 @@
 Copyright (c) 2012, The Regents of the University of California
-All rights reserved.
-Created by the Storage Systems Research Center, http://www.ssrc.ucsc.edu
-Department of Computer Science
+Created by the Storage Systems Research Center (http://www.ssrc.ucsc.edu),
+Department of Computer Science, University of California, Santa Cruz.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -27,3 +26,5 @@ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Unless otherwise noticed in each source code file.

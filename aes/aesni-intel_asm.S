@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2012, University of California, Santa Cruz, CA, USA.
  * Developers:
- *  Yan Li <yanli@ucsc.edu>
+ *  Yan Li <yanli@ascar.io>
  *
  * Based on Linux kernel 3.2.3:
  * Implement AES algorithm in Intel AES-NI instructions.

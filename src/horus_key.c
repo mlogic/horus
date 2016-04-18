@@ -8,7 +8,7 @@
 #include <limits.h>
 #include "timeval.h"
 
-#define HORUS_BUG_ADDRESS "horus@soe.ucsc.edu"
+#define HORUS_BUG_ADDRESS "yanli@ascar.io"
 char *progname;
 int benchmark = 0;
 
